@@ -1,4 +1,4 @@
-# AI TASKFLOW EDITION
+# AI TASKFLOW
 
 [![Architecture diagram of adam-mahmoud12/ai-workflow](https://gitdiagram.com/adam-mahmoud12/ai-workflow/diagram.png)](https://gitdiagram.com/adam-mahmoud12/ai-workflow?utm_source=readme&utm_medium=picture)
 
