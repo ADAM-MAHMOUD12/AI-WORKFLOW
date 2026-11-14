@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # AI TASKFLOW
+=======
+# OPENFILM-AI TASKFLOW EDITION
+>>>>>>> f17599aa (feat: force add and sync all remaining project folders and files)
 
 [![Architecture diagram of adam-mahmoud12/ai-workflow](https://gitdiagram.com/adam-mahmoud12/ai-workflow/diagram.png)](https://gitdiagram.com/adam-mahmoud12/ai-workflow?utm_source=readme&utm_medium=picture)
 
