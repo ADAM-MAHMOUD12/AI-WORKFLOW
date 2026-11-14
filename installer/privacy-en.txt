@@ -1,0 +1,11 @@
+OPENFILM-AI TASKFLOW EDITION — Privacy Notice and Agreement
+
+This application runs on your computer. Tasks, projects, account records, provider settings, and generated local project files are stored on the host device. Account passwords are stored as salted, slow password hashes. AI provider API keys are encrypted in the local database.
+
+When you use an AI provider, the prompt and any content you choose to attach are sent to that provider. Provider privacy, retention, and charges are governed by that provider. Video references in Motion Graphics are sampled into still frames in the browser; those frames may be sent to the selected AI provider. Uploaded voiceover audio remains in the local project; local silence analysis sends only timing results to the AI provider.
+
+Network sharing is off by default. If enabled by the host administrator, other devices on the same local network may reach the application. Use individual accounts and administrator approval. Do not expose this development application directly to the public internet.
+
+By selecting “I accept the agreement,” you confirm that you have read this notice, understand that you are responsible for the content sent to AI providers, and authorize the application to store your data on the host device.
+
+Created by ADAM MAHMOUD ABDELALIM.

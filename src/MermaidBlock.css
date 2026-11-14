@@ -1,0 +1,2 @@
+.mermaid-preview { display: grid; place-items: center; max-width: 100%; margin: 14px 0; padding: 14px; overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; background: #10131a; color: #ffb0a1; font-size: 11px; }
+.mermaid-preview svg { max-width: 100%; height: auto; }

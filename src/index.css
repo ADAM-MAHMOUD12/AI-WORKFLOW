@@ -1,0 +1,56 @@
+/* Base & global reset styles */
+html {
+  min-width: 320px;
+  min-height: 100%;
+  background: #090a10;
+  color-scheme: dark;
+  scroll-behavior: smooth;
+}
+
+* {
+  box-sizing: border-box;
+  scrollbar-color: rgba(139, 92, 246, 0.28) rgba(15, 17, 26, 0.7);
+  scrollbar-width: thin;
+}
+
+*::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+*::-webkit-scrollbar-track {
+  background: rgba(12, 14, 22, 0.7);
+}
+
+*::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(139, 92, 246, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: background 0.2s ease;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.45);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::selection {
+  background: rgba(139, 92, 246, 0.35);
+  color: #ffffff;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: #090a10;
+  color: #f1f0f7;
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100vh;
+}

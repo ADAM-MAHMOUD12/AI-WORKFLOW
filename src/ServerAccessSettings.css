@@ -1,0 +1,21 @@
+.server-access-settings > h3,
+.server-users-heading,
+.server-user-row,
+.server-user-row > div {
+  display: flex;
+  align-items: center;
+}
+
+.server-access-settings > h3 { gap: 8px; }
+.server-setting-list { display: grid; gap: 2px; margin: 18px 0; }
+.server-restart-note { padding: 10px 12px; border-radius: 9px; background: #e8a82a18; color: #d7a646 !important; }
+.server-users-heading { justify-content: space-between; gap: 12px; margin-top: 24px; }
+.server-users-heading h4 { margin: 0; }
+.server-user-list { display: grid; gap: 8px; margin-top: 10px; }
+.server-user-row { justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid #ffffff14; border-radius: 10px; }
+.server-user-row > span { display: grid; gap: 3px; }
+.server-user-row small { opacity: .7; }
+.server-user-row > div { gap: 6px; }
+.server-user-row button { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid #ffffff1f; border-radius: 8px; background: transparent; color: inherit; cursor: pointer; }
+.server-user-row button:disabled { opacity: .5; cursor: wait; }
+.server-logout { display: inline-flex; align-items: center; gap: 8px; margin-top: 20px; border: 0; background: transparent; color: #c98585; cursor: pointer; font: inherit; }
