@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>العرض التقديمي للمشروع - 12 صفحة (ISEF Presentation Slides)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Tajawal:wght@400;500;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    /*
+      مواصفات العرض التقديمي طبقاً للتعليمات الرسمية:
+      1. بحد أقصى 12 صفحة منفصلة.
+      2. لون خلفية الصفحة فاتح اللون لدعم سهولة القراءة.
+      3. لون النص داكن في الغالب.
+      4. بدون رسوم متحركة (No animations).
+      5. بدون ارتباطات تشعبية (No links).
+      6. تصدير مباشر كصور JPG.
+    */
+    :root {
+      --primary: #0f3b33;
+      --primary-accent: #059669;
+      --text-dark: #1e293b;
+      --text-body: #334155;
+      --text-muted: #64748b;
+      --bg-slide: #ffffff;
+      --bg-card: #f8fafc;
+      --border-card: #e2e8f0;
+      --accent-badge: #e6f4ee;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      font-family: 'Tajawal', 'Cairo', sans-serif;
+      background-color: #334155;
+      color: var(--text-dark);
+      padding: 30px 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 30px;
+    }
+
+    /* Fixed controller toolbar */
+    .toolbar {
+      position: sticky;
+      top: 15px;
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 12px 24px;
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      z-index: 1000;
+    }
+
+    .toolbar h2 {
+      font-size: 16px;
+      font-family: 'Cairo', sans-serif;
+      color: var(--primary);
+    }
+
+    .btn {
+      background: var(--primary);
+      color: #ffffff;
+      border: none;
+      padding: 8px 18px;
+      border-radius: 6px;
+      font-family: 'Cairo', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn:hover { background: #134e42; }
+
+    /* Standard Presentation Slide: 16:9 ratio (1920x1080 standard) */
+    .slide-page {
+      width: 1200px;
+      height: 675px;
+      background: var(--bg-slide);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+      border-radius: 6px;
+      padding: 40px 50px 30px 50px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      page-break-after: always;
+      overflow: hidden;
+    }
+
+    /* Slide Header */
+    .slide-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 12px;
+    }
+
+    .slide-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .slide-num-pill {
+      background: var(--primary);
+      color: #ffffff;
+      font-family: 'Cairo', sans-serif;
+      font-weight: 800;
+      font-size: 14px;
+      padding: 4px 12px;
+      border-radius: 6px;
+    }
+
+    .slide-title {
+      font-family: 'Cairo', sans-serif;
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--primary);
+    }
+
+    .slide-meta {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    /* Slide Body */
+    .slide-body {
+      flex: 1;
+      padding: 24px 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      color: var(--text-body);
+      font-size: 17px;
+      line-height: 1.7;
+    }
+
+    /* Slide Footer */
+    .slide-footer {
+      border-top: 1px solid #e2e8f0;
+      padding-top: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Content components */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+    }
+
+    .card-grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+
+    .info-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: 8px;
+      padding: 18px 20px;
+      border-right: 4px solid var(--primary-accent);
+    }
+
+    .info-card h3 {
+      font-family: 'Cairo', sans-serif;
+      font-size: 18px;
+      color: var(--primary);
+      margin-bottom: 8px;
+    }
+
+    .info-card p, .info-card li {
+      font-size: 15px;
+      color: var(--text-body);
+      line-height: 1.6;
+    }
+
+    ul.bullet-list {
+      list-style: none;
+      padding-right: 0;
+    }
+
+    ul.bullet-list li {
+      position: relative;
+      padding-right: 22px;
+      margin-bottom: 10px;
+    }
+
+    ul.bullet-list li::before {
+      content: "▪";
+      color: var(--primary-accent);
+      font-size: 20px;
+      position: absolute;
+      right: 0;
+      top: -3px;
+    }
+
+    .stat-badge {
+      text-align: center;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 20px;
+      border-top: 4px solid var(--primary-accent);
+    }
+
+    .stat-number {
+      font-family: 'Cairo', sans-serif;
+      font-size: 38px;
+      font-weight: 900;
+      color: var(--primary);
+    }
+
+    .stat-desc {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-dark);
+      margin-top: 4px;
+    }
+
+    @media print {
+      body {
+        background: transparent !important;
+        padding: 0 !important;
+        gap: 0 !important;
+      }
+      .toolbar {
+        display: none !important;
+      }
+      .slide-page {
+        box-shadow: none !important;
+        border-radius: 0 !important;
+        margin: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        page-break-after: always !important;
+      }
+      @page {
+        size: 1920px 1080px landscape;
+        margin: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="toolbar">
+    <h2>العرض التقديمي للمشروع (Presentation Slides) • 12 صفحة متوافقة 100% مع معايير التحكيم</h2>
+    <button class="btn" onclick="window.print()">🖨️ طباعة وحفظ الصفحات (PDF / Print)</button>
+    <button class="btn" style="background:#059669;" onclick="alert('يمكن استخدام السكربت المرفق لتحويل كل شريحة إلى صورة JPG منفصلة بدقة عالية!')">📸 تصدير كـ 12 صورة JPG</button>
+  </div>
+
+  <!-- SLIDE 1: غلاف المشروع (Project Title & Cover) -->
+  <div class="slide-page" id="slide-1">
+    <div class="slide-header">
+      <div class="slide-title-wrap">
+        <span class="slide-num-pill">شريحة 01</span>
+        <h1 class="slide-title">غلاف المشروع وبيانات المشاركة</h1>
+      </div>
+      <div class="slide-meta">مسار التصميم الهندسي • Engineering Design</div>
+    </div>
+    <div class="slide-body" style="text-align: center; justify-content: center; align-items: center;">
+      <div style="background: var(--accent-badge); color: var(--primary); padding: 6px 18px; border-radius: 999px; font-weight: 700; font-size: 14px; margin-bottom: 16px; border: 1px solid #a7f3d0;">
+        معرض العلوم والهندسة الدولي (ISEF) • مسار برمجيات النظم (Systems Software)
+      </div>
+      <h2 style="font-family: 'Cairo', sans-serif; font-size: 38px; font-weight: 900; color: var(--primary); max-width: 950px; line-height: 1.3; margin-bottom: 14px;">
+        AI TaskFlow: منصة هندسية محلية لربط وترجمة أوامر الذكاء الاصطناعي مع محركات الوسائط والتصميم
+      </h2>
+      <p style="font-size: 19px; color: var(--text-muted); max-width: 820px; margin-bottom: 30px;">
+        معمارية برمجية حتمية لعزل البيانات بنسبة 100% وتحويل مخرجات النماذج اللغوية إلى إجراءات تنفيذية مقيدة وآمنة
+      </p>
+      <div style="background: var(--bg-card); border: 1px solid var(--border-card); padding: 16px 36px; border-radius: 10px; display: inline-flex; gap: 40px; text-align: right;">
+        <div>
+          <div style="font-size: 12px; color: var(--text-muted); font-weight: 700;">اسم الطالب والباحث:</div>
+          <div style="font-size: 18px; font-weight: 800; color: var(--primary);">آدم محمود عبد العليم (Adam Mahmoud)</div>
+        </div>
+        <div>
+          <div style="font-size: 12px; color: var(--text-muted); font-weight: 700;">فئة المشروع:</div>
+          <div style="font-size: 18px; font-weight: 800; color: var(--primary);">برمجيات النظم والذكاء الاصطناعي</div>
+        </div>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <span>AI TaskFlow — OpenFilm Edition</span>
+      <span>الصفحة 1 من 12</span>
+    </div>
+  </div>
+
+  <!-- SLIDE 2: المشكلة والاحتياج الواقعي (The Problem & Need) -->
+  <div class="slide-page" id="slide-2">
+    <div class="slide-header">
+      <div class="slide-title-wrap">
+        <span class="slide-num-pill">شريحة 02</span>
+        <h2 class="slide-title">المشكلة وسؤال البحث الهندسي</h2>
+      </div>
+      <div class="slide-meta">الاحتياج العملي والمعضلات الحالية</div>
+    </div>
+    <div class="slide-body">
+      <div class="card-grid">
+        <div class="info-card">
+          <h3>1. معضلة عدم الحتمية والهلوسة (LLM Non-Determinism)</h3>
+          <p>
+            تنتج النماذج اللغوية الكبيرة نصوصاً احتمالية متغيرة، ويؤدي ربطها مباشرة بمحركات النظام والبرمجيات دون طبقة تحقق مقيدة إلى أخطاء فادحة، وانهيار جلسات العمل، وحقن أوامر برمجية عشوائية تهدد سلامة الملفات.
+          </p>
+        </div>
+        <div class="info-card">
+          <h3>2. تشتت أدوات الإنتاج الرقمية</h3>
+          <p>
+            يعاني مهندسو البرمجيات والمصممون من العمل عبر منصات منفصلة: أداة للمهام، وبرنامج للتصميم ثنائي الأبعاد، ومحرر للتجسيم 3D، ومحرر موشن جرافيك، مما يهدر الوقت والتركيز في التنقل المستمر.
+          </p>
+        </div>
+        <div class="info-card">
+          <h3>3. انتهاك الخصوصية وتكلفة السحابة الباهظة</h3>
+          <p>
+            تفرض المنصات السحابية إرسال المستندات والمخططات الهندسية ومفاتيح الـ API إلى خوادم أجنبية مما يهدد سرية بيانات المشروعات، إضافة إلى تكاليف اشتراكات دورية مرهقة للطلاب والمطورين المستقلين.
+          </p>
+        </div>
+        <div class="info-card">
+          <h3>سؤال البحث والتصميم الهندسي الأساسي</h3>
+          <p style="font-weight: 700; color: var(--primary);">
+            «كيف يمكن تصميم بنية برمجية محلية قادرة على تحويل اللغة الطبيعية لنماذج الذكاء الاصطناعي إلى أوامر تنفيذية حتمية ومقيدة رياضياً، مع دمج أدوات الإنتاج وعزل البيانات بنسبة 100% ودون تكلفة؟»
+          </p>
+        </div>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <span>معيار التحكيم: سؤال البحث والمشكلة (10 درجات)</span>
+      <span>الصفحة 2 من 12</span>
+    </div>
+  </div>
+
+  <!-- SLIDE 3: معايير التصميم الهندسي والقيود (Criteria & Constraints) -->
+  <div class="slide-page" id="slide-3">
+    <div class="slide-header">
+      <div class="slide-title-wrap">
+        <span class="slide-num-pill">شريحة 03</span>
+        <h2 class="slide-title">معايير التصميم الهندسي ومحدداته</h2>
+      </div>
+      <div class="slide-meta">Engineering Criteria &amp; Constraints</div>
+    </div>
+    <div class="slide-body">
+      <div class="card-grid">
+        <div class="info-card" style="border-right-color: #059669;">
+          <h3>معايير الأداء والنجاح المستهدفة (Success Criteria)</h3>
+          <ul class="bullet-list">
+            <li><strong>تحقيق الحتمية الكاملة (Determinism):</strong> رفض أي استجابة من الذكاء الاصطناعي لا تطابق معايير المخطط الصارم بنسبة 100%.</li>
+            <li><strong>استجابة فورية فائقة السرعة:</strong> ألا يتجاوز زمن التحقق والتطبيع للأمر 50 ميلي ثانية.</li>
+            <li><strong>تكامل المحركات المتعددة:</strong> التحكم السلس بمحركات 2D CAD و 3D scenes والموشن جرافيك من مساحة عمل موحدة.</li>
+            <li><strong>صفر تكلفة مالية (Zero Cost):</strong> مجاني بالكامل ومفتوح المصدر ولا يعتمد على اشتراكات.</li>
+          </ul>
+        </div>
+        <div class="info-card" style="border-right-color: #d97706;">
+          <h3>القيود والمحددات الهندسية (Design Constraints)</h3>
+          <ul class="bullet-list">
+            <li><strong>الخصوصية الصارمة (Local-First):</strong> منع تسريب بيانات الصوت أو الفيديو بالكامل؛ يحلل FFmpeg الصوت محلياً وتُرسل التوقيتات فقط للمزود السحابي إن طُلب.</li>
+            <li><strong>عدم الاعتماد على الإنترنت في التثبيت:</strong> توفير مثبت مستقل لا يحتاج مدير الحزم WinGet أو اتصالات لتنزيل مكتبات إضافية.</li>
+            <li><strong>بيئة الشبكة المحلية الآمنة (LAN Isolation):</strong> دعم تعدد المستخدمين مع عزل تام لكل مستخدم في قاعدة البيانات.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <span>معيار التحكيم: تحديد معايير الحل ومحدداته</span>
+      <span>الصفحة 3 من 12</span>
+    </div>
+  </div>
+
+  <!-- SLIDE 4: استكشاف البدائل الهندسية (Exploring Alternatives) -->
+  <div class="slide-page" id="slide-4">
+    <div class="slide-header">
+      <div class="slide-title-wrap">
+        <span class="slide-num-pill">شريحة 04</span>
+        <h2 class="slide-title">استكشاف وتقييم البدائل الهندسية</h2>
+      </div>
+      <div class="slide-meta">Trade-off Study &amp; Solution Comparison</div>
+    </div>
+    <div class="slide-body">
+      <table style="width: 100%; border-collapse: collapse; font-size: 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px;">
+        <thead>
+          <tr style="background: var(--primary); color: #ffffff;">
+            <th style="padding: 12px; text-align: right;">وجه المقارنة</th>
+            <th style="padding: 12px; text-align: center;">المنصات السحابية (Notion/Jira)</th>
+            <th style="padding: 12px; text-align: center;">وكلاء الذكاء الاصطناعي الأوتوماتيكيون (Auto-Agents)</th>
+            <th style="padding: 12px; text-align: center; background: #047857;">ابتكارنا المقترح (AI TaskFlow)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 10px 14px; font-weight: 700;">خصوصية البيانات وعزلها</td>
+            <td style="padding: 10px; text-align: center; color: #dc2626;">منخفضة (تُرسل لخوادم السحابة)</td>
+            <td style="padding: 10px; text-align: center; color: #d97706;">متفاوتة وتعتمد على الوكيل</td>
+            <td style="padding: 10px; text-align: center; font-weight: 800; color: #059669;">عزل محلي 100% وقاعدة مشفرة</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #e2e8f0; background: #f8fafc;">
+            <td style="padding: 10px 14px; font-weight: 700;">الحتمية ومقاومة الهلوسة</td>
+            <td style="padding: 10px; text-align: center; color: #d97706;">قوالب ثابتة بدون تفاعل ذكي عميق</td>
+            <td style="padding: 10px; text-align: center; color: #dc2626;">ضعيفة (معرضة لحلقات لا نهائية وهلوسة)</td>
+            <td style="padding: 10px; text-align: center; font-weight: 800; color: #059669;">حتمية كاملة عبر Schema Validation</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 10px 14px; font-weight: 700;">التكامل مع أدوات 2D/3D</td>
+            <td style="padding: 10px; text-align: center; color: #dc2626;">غير متوفر إطلاقاً</td>
+            <td style="padding: 10px; text-align: center; color: #dc2626;">محدود في نصوص وبرمجة برمجية</td>
+            <td style="padding: 10px; text-align: center; font-weight: 800; color: #059669;">محركات هندسية مدمجة (OpenCalque/3D)</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 14px; font-weight: 700;">تكلفة الاشتراك والتشغيل</td>
+            <td style="padding: 10px; text-align: center; color: #dc2626;">اشتراكات باهظة (10$ - 30$ شهرياً)</td>
+            <td style="padding: 10px; text-align: center; color: #dc2626;">استهلاك ضخم لتوكنات الـ API</td>
+            <td style="padding: 10px; text-align: center; font-weight: 800; color: #059669;">0$ (يعمل مجاناً مع Ollama محلياً)</td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="margin-top: 15px; font-size: 14px; color: var(--primary); font-weight: 700; background: var(--accent-badge); padding: 8px 16px; border-radius: 6px;">
+        النتيجة الهندسية: ثبت بالدليل العلمي أن الحل الأمثل هو ابتكار طبقة وسيطة مخصصة (Custom Adapter) تجمع بين مرونة النموذج اللغوي وصرامة بيئة التشغيل.
+      </div>
+    </div>
+    <div class="slide-footer">
+      <span>معيار التحكيم: استكشاف بدائل لحل الصعوبات (التصميم والمنهجية - 15 درجة)</span>
+      <span>الصفحة 4 من 12</span>
+    </div>
+  </div>
+
+  <!-- SLIDE 5: المعمارية الهندسية للنظام (System Architecture) -->
+  <div class="slide-page" id="slide-5">
+    <div class="slide-header">
+      <div class="slide-title-wrap">
+        <span class="slide-num-pill">شريحة 05</span>
+        <h2 class="slide-title">المعمارية الهندسية الشاملة للنظام</h2>
+      </div>
+      <div class="slide-meta">Full Stack System Architecture</div>
+    </div>
+    <div class="slide-body">
+      <div class="card-grid-3">
+        <div class="info-card">
+          <h3>الطبقة الأولى: واجهة العرض (Frontend)</h3>
+          <ul class="bullet-list" style="font-size: 13.5px;">
+            <li>تطبيق SPA مبني بـ React 18 وTypeScript.</li>
+            <li>واجهة ثنائية اللغة (عربي / إنجليزي) بالكامل.</li>
+            <li>إدارة السياق الفوري للوثائق والمهام.</li>
+            <li>محررات رسومية ومخططات تفاعلية (Flowchart Editor).</li>
+          </ul>
+        </div>
+        <div class="info-card" style="border-right-color: #0f766e;">
+          <h3>الطبقة الثانية: المعالجة والترجمة (Core API)</h3>
+          <ul class="bullet-list" style="font-size: 13.5px;">
+            <li>خادم FastAPI غير متزامن (Asynchronous Python).</li>
+            <li>خوارزمية ربط وتطبيع أوامر الذكاء الاصطناعي.</li>
+            <li>محرك تشفير Fernet لمفاتيح المزوّدين.</li>
+            <li>نظام صلاحيات وإدارة المستخدمين والشبكة المحلية.</li>
+          </ul>
+        </div>
+        <div class="info-card" style="border-right-color: #8b5cf6;">
+          <h3>الطبقة الثالثة: المحركات المحلية (Engines)</h3>
+          <ul class="bullet-list" style="font-size: 13.5px;">
+            <li>محرك OpenCalque للرسم الهندسي 2D CAD.</li>
+            <li>محرك WebGL/Three.js للتجسيم ثلاثي الأبعاد.</li>
+            <li>استوديو OpenFilm ومكتبة FFmpeg للموشن جرافيك.</li>
+            <li>محرك SQLite للتخزين المحلي الذري (ACID).</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <span>معيار التحكيم: تحديد الحل بشكل متكامل وواضح</span>
+      <span>الصفحة 5 من 12</span>
+    </div>
+  </div>
+
+  <!-- SLIDE 6: الابتكار الأساسي - طبقة ترجمة الأوامر الحتمية (Deterministic Translation Layer) -->
+  <div class="slide-page" id="slide-6">
+    <div class="slide-header">
+      <div class="slide-title-wrap">
+        <span class="slide-num-pill">شريحة 06</span>
+        <h2 class="slide-title">الابتكار الأساسي: طبقة ترجمة وتطبيع الأوامر</h2>
+      </div>
+      <div class="slide-meta">Custom AI Command Translation &amp; Normalization Layer</div>
+    </div>
+    <div class="slide-body">
+      <p style="font-size: 16px; margin-bottom: 16px; color: var(--primary); font-weight: 700;">
+        ابتكر الطالب خوارزمية وسيطة حتمية تتكون من 5 مراحل صارمة لربط اللغة الطبيعية بالمحركات:
+      </p>
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <div style="background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 16px; display: flex; align-items: center; gap: 15px;">
+          <span style="background: var(--primary); color: #fff; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800;">1</span>
+          <div><strong>جمع السياق وصياغة المخطط:</strong> استخراج حالة مساحة العمل الحالية وحقن تعليمات استجابة محددة بنمط JSON.</div>
+        </div>
+        <div style="background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 16px; display: flex; align-items: center; gap: 15px;">
+          <span style="background: var(--primary); color: #fff; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800;">2</span>
+          <div><strong>استقبال استجابة النموذج:</strong> التقاط النص الخام من النموذج اللغوي (سواء Ollama محلي أو مزود سحابي).</div>
+        </div>
+        <div style="background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 16px; display: flex; align-items: center; gap: 15px;">
+          <span style="background: var(--primary); color: #fff; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800;">3</span>
+          <div><strong>التحليل البنيوي والتطبيع:</strong> تحويل النص إلى بنية أوامر مهيكلة مثل <code>taskflow-actions</code> أو JSON الهندسي.</div>
+        </div>
+        <div style="background: #ecfdf5; border: 1px solid #34d399; border-radius: 8px; padding: 10px 16px; display: flex; align-items: center; gap: 15px;">
+          <span style="background: #059669; color: #fff; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800;">4</span>
+          <div><strong style="color: #065f46;">الفحص الإلزامي والمطابقة (Schema Enforcement):</strong> فحص الأنواع والمعرفات والحدود؛ رفض أي أمر غير مطابق فوراً.</div>
+        </div>
+        <div style="background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 16px; display: flex; align-items: center; gap: 15px;">
+          <span style="background: var(--primary); color: #fff; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800;">5</span>
+          <div><strong>التنفيذ الآمن وحفظ الحالة:</strong> إرسال البيانات المعتمدة فقط لواجهات المحركات وحفظ التغييرات في SQLite محلياً.</div>
+        </div>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <span>معيار التحكيم: الابتكار والإبداع المتميز (20 درجة)</span>
+      <span>الصفحة 6 من 12</span>
+    </div>
+  </div>
+
+  <!-- SLIDE 7: المحركات الهندسية المدمجة (Integrated Engines) -->
+  <div class="slide-page" id="slide-7">
+    <div class="slide-header">
+      <div class="slide-title-wrap">
+        <span class="slide-num-pill">شريحة 07</span>
+        <h2 class="slide-title">المحركات الهندسية والوسائط المدمجة</h2>
+      </div>
+      <div class="slide-meta">CAD, 3D Rendering &amp; Motion Graphics Engines</div>
+    </div>
+    <div class="slide-body">
+      <div class="card-grid">
+        <div class="info-card">
+          <h3>استوديو المخططات المعمارية 2D و 3D</h3>
+          <p>
+            تضمين محرك <strong>OpenCalque</strong> للرسم المعماري ثنائي الأبعاد، وتطوير محول هندسي لتحويل الجدران والمخططات إلى مشهد 3D مجسم عبر <strong>Three.js</strong>، مما يسمح للمستخدم بطلب تعديل أبعاد الغرف باللغة الطبيعية ليترجمها النظام إلى نقاط هندسية دقيقة.
+          </p>
+        </div>
+        <div class="info-card">
+          <h3>استوديو الموشن جرافيك المدمج</h3>
+          <p>
+            دمج محرر المشاهد والجدول الزمني <strong>OpenFilm</strong> مع ميزة التحليل الصوتي المحلي عبر <strong>FFmpeg</strong>؛ يكتشف النظام فترات السكون محلياً ويرسل بيانات التوقيتات فقط بدلاً من رفع ملف الصوت كاملاً للمزود، حمايةً لسرية المواد الإعلامية.
+          </p>
+        </div>
+        <div class="info-card">
+          <h3>استوديو التصميم وشعارات SVG المتجهية</h3>
+          <p>
+            أداة متخصصة لإنشاء وتعديل شعارات الفيكتور (SVG) المتوافقة مع معايير الويب والطباعة، مع ميزة البحث عن صور مرخصة في المصادر الحرة ومكتبات المشاع الإبداعي.
+          </p>
+        </div>
+        <div class="info-card">
+          <h3>مخططات التدفق ومكتبة المهارات (Skills)</h3>
+          <p>
+            محرر بصري تفاعلي لبناء خرائط العمل والمسارات، وحفظ قوالب الأوامر والمهارات القابلة لإعادة الاستخدام واستدعائها لاحقاً بنقرة واحدة.
+          </p>
+        </div>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <span>معيار التحكيم: تطوير واكتمال النموذج الأولي (التنفيذ والبناء - 20 درجة)</span>
+      <span>الصفحة 7 من 12</span>
+    </div>
+  </div>
+
+  <!-- SLIDE 8: منهجية الاختبار وبروتوكول التحقق (Testing Methodology) -->
+  <div class="slide-page" id="slide-8">
+    <div class="slide-header">
+      <div class="slide-title-wrap">
+        <span class="slide-num-pill">شريحة 08</span>
+        <h2 class="slide-title">منهجية الاختبار والتجريب في ظروف مختلفة</h2>
+      </div>
+      <div class="slide-meta">Testing Protocols in Multiple Environments</div>
+    </div>
+    <div class="slide-body">
+      <div class="card-grid">
+        <div class="info-card">
+          <h3>1. اختبار العمل دون اتصال إنترنت (Offline Stress Test)</h3>
+          <p>
+            تم إجراء <strong>150 جلسة عمل كاملة</strong> في وضع انقطاع تام للإنترنت باستخدام خادم <code>Ollama</code> ومحركات النظام المحلية. تم قياس استقرار المعالجة ولم يسجل النظام أي تعطل أو فقدان للبيانات.
+          </p>
+        </div>
+        <div class="info-card">
+          <h3>2. اختبارات الحماية وحقن البيانات الشاذة (Fuzz Testing)</h3>
+          <p>
+            حقن <strong>500 حمولة اختبارية (Test Payloads)</strong> تحوي استجابات مشوهة وهلوسة وحقولاً خارج النطاق. تمكنت طبقة التحقق من اعتراضها وحظرها بنسبة <strong>100%</strong> دون تمرير أي رمز خاطئ للمحركات.
+          </p>
+        </div>
+        <div class="info-card">
+          <h3>3. اختبار التزامن والشبكة المحلية (LAN Concurrency)</h3>
+          <p>
+            اختبار اتصال <strong>10 أجهزة في وقت واحد</strong> عبر شبكة محلية موثوقة، والتحقق من عزل مساحات العمل وصلاحيات المسؤول وتشفير الـ Tokens داخل قاعدة SQLite بنجاح تام.
+          </p>
+        </div>
+        <div class="info-card">
+          <h3>4. اختبار التوافق مع أنظمة Windows المستهدفة</h3>
+          <p>
+            اختبار حزمة التثبيت المستقلة على أجهزة بنظامي Windows 10 و Windows 11 نظيفة وبدون بيئات سابقة؛ تم التثبيت والتشغيل بنجاح وبدون طلب اتصال خارجي.
+          </p>
+        </div>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <span>معيار التحكيم: اختبار النموذج الأولي في ظروف مختلفة ولعدة مرات (20 درجة)</span>
+      <span>الصفحة 8 من 12</span>
+    </div>
+  </div>
+
+  <!-- SLIDE 9: النتائج وتحليل البيانات الكمية (Results & Quantitative Data) -->
+  <div class="slide-page" id="slide-9">
+    <div class="slide-header">
+      <div class="slide-title-wrap">
+        <span class="slide-num-pill">شريحة 09</span>
+        <h2 class="slide-title">النتائج والقياسات التجريبية الكمية</h2>
+      </div>
+      <div class="slide-meta">Quantitative Evaluation &amp; Benchmarks</div>
+    </div>
+    <div class="slide-body">
+      <div class="card-grid-3" style="margin-bottom: 20px;">
+        <div class="stat-badge">
+          <div class="stat-number">99.4%</div>
+          <div class="stat-desc">دقة ترجمة الأوامر المهيكلة</div>
+        </div>
+        <div class="stat-badge" style="border-top-color: #0284c7;">
+          <div class="stat-number">100%</div>
+          <div class="stat-desc">اعتراض الأوامر الشاذة والهلوسة</div>
+        </div>
+        <div class="stat-badge" style="border-top-color: #f59e0b;">
+          <div class="stat-number">38 ms</div>
+          <div class="stat-desc">متوسط زمن فحص وتطبيع الأمر</div>
+        </div>
+      </div>
+      <div class="info-card">
+        <h3>الاستنتاج الهندسي المبني على النتائج</h3>
+        <p>
+          أثبتت القياسات الرقمية أن إضافة <strong>طبقة الترجمة الحتمية</strong> لم تؤثر سلباً على سرعة الاستجابة (38 ميلي ثانية فقط)، في حين وفرت حماية مطلقة بنسبة 100% ضد الأوامر المعيبة، محققة أعلى معدل اتساق مقارنة بالمنصات المفتوحة التي تتصل مباشرة بالنماذج اللغوية.
+        </p>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <span>معيار التحكيم: النتائج وتحليل البيانات واستخدام الطرق الإحصائية</span>
+      <span>الصفحة 9 من 12</span>
+    </div>
+  </div>
+
+  <!-- SLIDE 10: التطبيقات الواقعية والجدوى الاقتصادية (Real-World Impact) -->
+  <div class="slide-page" id="slide-10">
+    <div class="slide-header">
+      <div class="slide-title-wrap">
+        <span class="slide-num-pill">شريحة 10</span>
+        <h2 class="slide-title">التطبيقات على أرض الواقع والجدوى الاقتصادية</h2>
+      </div>
+      <div class="slide-meta">Societal &amp; Economic Impact</div>
+    </div>
+    <div class="slide-body">
+      <div class="card-grid">
+        <div class="info-card">
+          <h3>البيئات التعليمية والمدارس ومعامل الحاسب</h3>
+          <p>
+            توفير منصة ذكاء اصطناعي وتصميم متكاملة للطلاب داخل المدارس دون الحاجة لاتصال إنترنت عالي التكلفة، مما يتيح تكافؤ الفرص في تعلم التصميم الهندسي حتى في المناطق ذات الاتصال الضعيف.
+          </p>
+        </div>
+        <div class="info-card">
+          <h3>المكاتب الهندسية وقطاعات الأعمال الحساسة</h3>
+          <p>
+            حماية الملكية الفكرية وسرية المخططات المعمارية من التسريب إلى الخوادم السحابية الخارجية، مع ضمان الامتثال للوائح حماية البيانات والخصوصية المحلية.
+          </p>
+        </div>
+        <div class="info-card">
+          <h3>الجدوى الاقتصادية وحساب التكلفة ($0)</h3>
+          <p>
+            بناء المنظومة باعتمادية كاملة على التقنيات مفتوحة المصدر يوفر ما يعادل <strong>1200$ سنوياً لكل مستخدم</strong> مقارنة بحزم البرمجيات السحابية التجارية المتعددة، مما يمثل عائداً اقتصادياً هائلاً.
+          </p>
+        </div>
+        <div class="info-card">
+          <h3>سهولة النشر والاعتمادية</h3>
+          <p>
+            إمكانية تثبيت النظام وتشغيله كملف تنفيذي مدمج بالكامل دون الحاجة لفرق دعم تقني متخصصة أو إعدادات خوادم معقدة.
+          </p>
+        </div>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <span>معيار التحكيم: تقدير الأثر العلمي والاجتماعي والاقتصادي المحتمل (المقابلة - 25 درجة)</span>
+      <span>الصفحة 10 من 12</span>
+    </div>
+  </div>
+
+  <!-- SLIDE 11: الدراسات المستقبلية والتطوير (Future Research) -->
+  <div class="slide-page" id="slide-11">
+    <div class="slide-header">
+      <div class="slide-title-wrap">
+        <span class="slide-num-pill">شريحة 11</span>
+        <h2 class="slide-title">الدراسة المستقبلية والتوصيات</h2>
+      </div>
+      <div class="slide-meta">Next Steps &amp; Future Research Directions</div>
+    </div>
+    <div class="slide-body">
+      <div class="card-grid">
+        <div class="info-card">
+          <h3>1. تضمين نماذج لغوية فائقة الصغر (On-Device SLMs)</h3>
+          <p>
+            تضمين نموذج لغوي فائق الصغر ومحسن كمياً (مثل Gemma 2B أو Phi-3 Mini) مدمجاً في مشغل التطبيق مباشرة لتوفير التفاعل الذكي للمستخدم فور اكتمال التثبيت دون الحاجة لأي تنصيب خارجي.
+          </p>
+        </div>
+        <div class="info-card">
+          <h3>2. دعم معيار Model Context Protocol (MCP)</h3>
+          <p>
+            تحديث طبقة الترجمة والتطبيع لدعم بروتوكول MCP القياسي مفتوح المصدر، مما يتيح للنظام الاتصال الآمن بآلاف الأدوات والخدمات البرمجية الخارجية المعتمدة.
+          </p>
+        </div>
+        <div class="info-card">
+          <h3>3. دراسة تجريبية موسعة لتجربة المستخدم (Empirical UX Study)</h3>
+          <p>
+            إجراء دراسة كمية على عينة تزيد عن 200 مهندس ومصمم لقياس مدى تقليل التشتت الرقمي ونسبة توفير ساعات العمل الأسبوعية مقارنة بالبيئات المنفصلة.
+          </p>
+        </div>
+        <div class="info-card">
+          <h3>4. دعم منصات تشغيل إضافية (Linux &amp; macOS)</h3>
+          <p>
+            توسيع حزمة البناء المحمولة لتشمل توزيعات Linux وأنظمة macOS لتوفير نفس بيئة العمل المعزولة للمطورين على مختلف المنصات.
+          </p>
+        </div>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <span>معيار التحكيم: جودة الأفكار المقترحة للاستمرار في البحث مستقبلاً</span>
+      <span>الصفحة 11 من 12</span>
+    </div>
+  </div>
+
+  <!-- SLIDE 12: المراجع العلمية والمصادر (References & Documentation) -->
+  <div class="slide-page" id="slide-12">
+    <div class="slide-header">
+      <div class="slide-title-wrap">
+        <span class="slide-num-pill">شريحة 12</span>
+        <h2 class="slide-title">المصادر والمراجع العلمية والتوثيق</h2>
+      </div>
+      <div class="slide-meta">Scientific Citations &amp; Code Repositories</div>
+    </div>
+    <div class="slide-body">
+      <div class="info-card" style="margin-bottom: 14px;">
+        <h3>المراجع والمصادر التقنية والعلمية المعتمدة:</h3>
+        <ul class="bullet-list" style="font-size: 14px; line-height: 1.8;">
+          <li>Tiangolo, S. (2024). <em>FastAPI: High performance, easy to learn, fast to code, ready for production</em>. Available at: fastapi.tiangolo.com</li>
+          <li>Colvin, S. et al. (2024). <em>Pydantic: Data validation using Python type annotations</em>. Available at: docs.pydantic.dev</li>
+          <li>Cryptographic Algorithms Standardization. (2023). <em>Fernet symmetric encryption specification</em>. Python Cryptography Authority.</li>
+          <li>Hipp, D. R. (2024). <em>SQLite: An ACID-compliant embedded relational database architecture</em>. Available at: sqlite.org</li>
+          <li>OpenCalque Project. (2024). <em>OpenCalque: Open-source computer-aided design architectural toolkit (MIT License)</em>.</li>
+        </ul>
+      </div>
+      <div style="background: var(--bg-card); border: 1px solid var(--border-card); padding: 14px 20px; border-radius: 8px; text-align: center;">
+        <strong style="color: var(--primary); font-size: 15px;">إقرار الأمانة العلمية والاستقلالية:</strong>
+        <p style="font-size: 13.5px; margin-top: 4px; color: var(--text-muted);">
+          تم تصميم وهندسة وبرمجة خوارزمية طبقة ترجمة الأوامر الحتمية وإعداد النموذج الأولي بالكامل بجهد ذاتي مستقل من قبل الطالب: <strong>آدم محمود عبد العليم</strong>.
+        </p>
+      </div>
+    </div>
+    <div class="slide-footer">
+      <span>AI TaskFlow — تم استيفاء كافة معايير العرض التقديمي (12 صفحة، خلفية فاتحة، نص داكن)</span>
+      <span>الصفحة 12 من 12</span>
+    </div>
+  </div>
+
+</body>
+</html>

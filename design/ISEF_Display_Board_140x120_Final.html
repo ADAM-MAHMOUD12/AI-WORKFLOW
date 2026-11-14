@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>لوحة العرض العلمي والهندسي - AI TaskFlow - آدم محمود عبد العليم</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@500;700;800;900&family=Tajawal:wght@400;500;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #07221d;
+      --primary-mid: #0d3b32;
+      --primary-light: #185a4d;
+      --accent: #059669;
+      --accent-light: #10b981;
+      --accent-subtle: #ecfdf5;
+      --accent-warn: #d97706;
+      --text-main: #0f172a;
+      --text-body: #334155;
+      --text-muted: #64748b;
+      --bg-board: #f1f5f3;
+      --card-bg: #ffffff;
+      --border-card: #cbd5e1;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    @page {
+      size: 1400mm 1200mm;
+      margin: 0;
+    }
+
+    html, body {
+      width: 1400mm;
+      height: 1200mm;
+      margin: 0;
+      padding: 0;
+      background: var(--bg-board);
+      font-family: 'Tajawal', 'Cairo', sans-serif;
+      color: var(--text-main);
+      direction: rtl;
+      overflow: hidden;
+    }
+
+    .poster-wrapper {
+      width: 1400mm;
+      height: 1200mm;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-board);
+      position: relative;
+    }
+
+    /* HEADER BANNER */
+    .header-banner {
+      height: 145mm;
+      background: linear-gradient(135deg, #051a16 0%, #0d3b32 50%, #164e43 100%);
+      color: #ffffff;
+      padding: 16mm 25mm 14mm 25mm;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 5mm solid var(--accent-light);
+      flex-shrink: 0;
+    }
+
+    .header-left {
+      flex: 1;
+    }
+
+    .header-tag {
+      display: inline-block;
+      background: rgba(16, 185, 129, 0.2);
+      border: 1.5mm solid rgba(52, 211, 153, 0.6);
+      color: #a7f3d0;
+      padding: 2.5mm 12mm;
+      border-radius: 999px;
+      font-size: 13.5pt;
+      font-weight: 700;
+      margin-bottom: 5mm;
+      letter-spacing: 0.5px;
+    }
+
+    .header-title {
+      font-family: 'Cairo', sans-serif;
+      font-size: 38pt;
+      font-weight: 900;
+      color: #ffffff;
+      line-height: 1.25;
+      text-shadow: 0 3px 8px rgba(0,0,0,0.4);
+    }
+
+    .header-subtitle {
+      font-size: 18pt;
+      font-weight: 500;
+      color: #bbf7d0;
+      margin-top: 3.5mm;
+    }
+
+    .student-card {
+      background: rgba(255, 255, 255, 0.08);
+      border: 2mm solid rgba(255, 255, 255, 0.25);
+      border-radius: 10mm;
+      padding: 10mm 18mm;
+      text-align: right;
+      min-width: 320mm;
+    }
+
+    .student-card .role {
+      font-size: 13pt;
+      color: #86efac;
+      font-weight: 700;
+    }
+
+    .student-card .name {
+      font-family: 'Cairo', sans-serif;
+      font-size: 26pt;
+      font-weight: 900;
+      color: #ffffff;
+      margin: 2mm 0;
+    }
+
+    .student-card .meta {
+      font-size: 14pt;
+      color: #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* 3-PANEL BODY GRID: 35cm (350mm) | 70cm (700mm) | 35cm (350mm) */
+    .board-body {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 338mm 684mm 338mm;
+      gap: 15mm;
+      padding: 14mm 18mm;
+      background: #f1f5f3;
+      overflow: hidden;
+    }
+
+    .panel {
+      display: flex;
+      flex-direction: column;
+      gap: 12mm;
+      height: 100%;
+    }
+
+    /* CARD STYLING */
+    .card {
+      background: var(--card-bg);
+      border-radius: 8mm;
+      border: 1.5mm solid var(--border-card);
+      box-shadow: 0 4mm 10mm rgba(7, 34, 29, 0.06);
+      padding: 10mm 12mm;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 7mm;
+      margin-bottom: 7mm;
+      border-bottom: 1.5mm solid #e2e8f0;
+      padding-bottom: 5mm;
+    }
+
+    .card-num {
+      width: 19mm;
+      height: 19mm;
+      background: var(--primary-mid);
+      color: #ffffff;
+      border-radius: 5mm;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Cairo', sans-serif;
+      font-weight: 900;
+      font-size: 14pt;
+      flex-shrink: 0;
+    }
+
+    .card-title {
+      font-family: 'Cairo', sans-serif;
+      font-size: 18pt;
+      font-weight: 800;
+      color: var(--primary-mid);
+      line-height: 1.2;
+    }
+
+    .card-subtitle {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11pt;
+      color: var(--text-muted);
+      font-weight: 700;
+      margin-right: auto;
+    }
+
+    .card-body {
+      font-size: 13.5pt;
+      line-height: 1.65;
+      color: var(--text-body);
+      text-align: justify;
+    }
+
+    .card-body p {
+      margin-bottom: 5mm;
+    }
+
+    .card-body strong {
+      color: var(--text-main);
+      font-weight: 800;
+    }
+
+    ul.real-list {
+      list-style: none;
+      padding-right: 0;
+      margin: 4mm 0;
+    }
+
+    ul.real-list li {
+      position: relative;
+      padding-right: 11mm;
+      margin-bottom: 4.5mm;
+      font-size: 13pt;
+      line-height: 1.55;
+    }
+
+    ul.real-list li::before {
+      content: "▪";
+      color: var(--accent);
+      font-size: 17pt;
+      position: absolute;
+      right: 1mm;
+      top: -1mm;
+    }
+
+    .callout-box {
+      background: #ecfdf5;
+      border-right: 3mm solid var(--accent);
+      border-radius: 4mm;
+      padding: 5mm 8mm;
+      margin: 4mm 0;
+      font-size: 12.5pt;
+      font-weight: 600;
+      color: #065f46;
+      line-height: 1.55;
+    }
+
+    .chart-container {
+      background: #ffffff;
+      border: 1mm solid #cbd5e1;
+      border-radius: 6mm;
+      padding: 4mm;
+      margin: 4mm 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .chart-container img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4mm;
+    }
+
+    /* FOOTER */
+    .poster-footer {
+      height: 38mm;
+      background: #e2ebe6;
+      border-top: 1.5mm solid #cbdcd3;
+      padding: 0 25mm;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12pt;
+      font-weight: 700;
+      color: #334155;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+
+<div class="poster-wrapper">
+
+  <!-- HEADER -->
+  <header class="header-banner">
+    <div class="header-left">
+      <div class="header-tag">مسابقة معرض العلوم والهندسة الدولي (ISEF) • مسار التصميم الهندسي (ENGINEERING DESIGN)</div>
+      <h1 class="header-title">منصة AI TaskFlow: بنية برمجية محلية لربط وترجمة أوامر الذكاء الاصطناعي مع محركات الوسائط</h1>
+      <div class="header-subtitle">معمارية حتمية تمنع هلوسة النماذج اللغوية، وتعزل البيانات بنسبة 100%، وتتحكم بمحركات 2D/3D والموشن بتكلفة 0$</div>
+    </div>
+    <div class="student-card">
+      <div class="role">إعداد وتصميم الطالب والباحث</div>
+      <div class="name">آدم محمود عبد العليم (Adam Mahmoud)</div>
+      <div class="meta">
+        <span>فئة المشروع: برمجيات النظم (Systems Software)</span>
+        <span>الإصدار: v2.4 Architecture</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 3-PANEL BODY -->
+  <main class="board-body">
+
+    <!-- ==================== RIGHT PANEL: 35 CM (البداية الهندسية) ==================== -->
+    <section class="panel">
+
+      <!-- 1. المشكلة والاحتياج العملي -->
+      <div class="card" style="flex: 1.15;">
+        <div class="card-header">
+          <div class="card-num">01</div>
+          <div>
+            <div class="card-title">المشكلة والاحتياج العملي من تجربتي</div>
+            <div class="card-subtitle">PROBLEM &amp; PRACTICAL NEED</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <p>
+            أثناء عملي على تطوير المشروعات الرقمية وتجربة دمج الذكاء الاصطناعي، واجهتني <strong>3 عوائق حقيقية</strong> أعاقت الإنتاجية:
+          </p>
+          <ul class="real-list">
+            <li><strong>تشتت أدوات العمل:</strong> كنت أتنقل باستمرار بين 4 برامج منفصلة (أداة مهام، برنامج رسم معمارى 2D، محرر 3D، ومحرر فيديو).</li>
+            <li><strong>مخاطر الخصوصية والسرية:</strong> المنصات السحابية تجبرنا على رفع المخططات والأكواد لخوادم أجنبية مما ينتهك الملكية الفكرية.</li>
+            <li><strong>معضلة الهلوسة في الـ AI (Non-Determinism):</strong> النماذج اللغوية تخرج كلاماً إنشائياً متغيراً؛ وتمريره مباشرة للمحركات كأوامر برمجية يسبب انهيار التطبيق ومسح الملفات.</li>
+          </ul>
+          <div class="callout-box">
+            <strong>سؤال بحثي وتصميمي الهندسي:</strong><br>
+            «كيف أصمم نظاماً برمجياً محلياً (Local-First) يعزل البيانات بالكامل، ويحتوي على طبقة وسيطة حتمية تلزم الـ AI بأوامر مقيدة ومفحوصة بنسبة 100% دون أن تكلفني دولاراً واحداً؟»
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. الخلفية العلمية وأصالة الفكرة -->
+      <div class="card" style="flex: 1;">
+        <div class="card-header">
+          <div class="card-num">02</div>
+          <div>
+            <div class="card-title">الخلفية العلمية وأصالة الفكرة</div>
+            <div class="card-subtitle">BACKGROUND &amp; ORIGINALITY</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <p>لم أدعِ تدريب نموذج ذكاء اصطناعي جديد من الصفر، بل وظفت <strong>أسس هندسة البرمجيات الصلبة</strong>:</p>
+          <ul class="real-list">
+            <li><strong>قواعد اللغات والمترجمات (AST &amp; Grammar Parsing):</strong> فرضت قيود بنيوية حتمية (Schema Enforcement) على النموذج بدلاً من قبول النص الحر.</li>
+            <li><strong>التشفير المتماثل (Fernet Encryption):</strong> قمت بتشفير مفاتيح الـ API محلياً بخوارزمية AES-128-CBC ومصادقة HMAC-SHA256.</li>
+            <li><strong>المعاملات الذرية المعزولة (SQLite ACID):</strong> عزل تام لبيانات كل حساب ومساحة عمل محلياً.</li>
+            <li><strong>أصالة الفكرة:</strong> المنصات الحالية إما شات بوت نصي جامد أو برامج منفصلة؛ ابتكاري هو بناء جسر حتمي بين لغة النموذج والمحركات.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- 3. المواد والتقنيات البرمجية -->
+      <div class="card" style="flex: 0.95;">
+        <div class="card-header">
+          <div class="card-num">03</div>
+          <div>
+            <div class="card-title">المواد والتقنيات البرمجية</div>
+            <div class="card-subtitle">MATERIALS &amp; TECH STACK</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <ul class="real-list">
+            <li><strong>الخادم والباك إند:</strong> Python 3.12 + FastAPI (معالجة غير متزامنة فائقة السرعة).</li>
+            <li><strong>الواجهة الأمامية:</strong> React 18 + TypeScript + Vite (تصميم تفاعلي ثنائي اللغة).</li>
+            <li><strong>محرك التحقق والتطبيع:</strong> Pydantic v2 + Zod Schemas (فحص حتمي للأنواع).</li>
+            <li><strong>المحركات المحلية:</strong> OpenCalque (2D CAD) + Three.js (3D) + FFmpeg.</li>
+            <li><strong>المثبت المستقل:</strong> Inno Setup مدمج به بايثون ونود وبن للعمل بدون إنترنت.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- 4. إجراءات ومنهجية التصميم -->
+      <div class="card" style="flex: 0.9;">
+        <div class="card-header">
+          <div class="card-num">04</div>
+          <div>
+            <div class="card-title">إجراءات ومنهجية العمل</div>
+            <div class="card-subtitle">METHODOLOGY &amp; PROCEDURES</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <ul class="real-list">
+            <li><strong>1. تحديد الثغرات:</strong> حصر حالات انهيار الـ LLMs عند التحكم بالواجهات.</li>
+            <li><strong>2. صياغة البروتوكول:</strong> تعريف بنية أوامر <code>taskflow-actions</code> المقيدة.</li>
+            <li><strong>3. برمجة الوسيط:</strong> كتابة طبقة الفحص والترجمة بلغة بايثون وتايب سكريبت.</li>
+            <li><strong>4. دمج المحركات:</strong> ربط محرك الرسم 2D والتجسيم 3D والموشن جرافيك.</li>
+            <li><strong>5. الاختبارات المعملية:</strong> إجراء 500 اختبار حقن أخطاء واختبارات الضغط.</li>
+          </ul>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ==================== CENTER PANEL: 70 CM (قلب الابتكار والاختبار) ==================== -->
+    <section class="panel">
+
+      <!-- 5. بناء واختبار النموذج الأولي (الابتكار الأساسي) -->
+      <div class="card" style="flex: 1.35;">
+        <div class="card-header">
+          <div class="card-num" style="background: var(--accent); color: #fff;">05</div>
+          <div>
+            <div class="card-title">بناء النموذج الأولي وابتكار طبقة الترجمة الحتمية</div>
+            <div class="card-subtitle">PROTOTYPE ARCHITECTURE &amp; CUSTOM AI INTEGRATION LAYER</div>
+          </div>
+          <div style="margin-right: auto; background: #ecfdf5; border: 1.5mm solid #10b981; color: #047857; padding: 2mm 8mm; border-radius: 4mm; font-size: 11pt; font-weight: 800;">
+            ابتكار هندسي مبرمج بالكامل من إعداد الباحث
+          </div>
+        </div>
+        <div class="card-body">
+          <p>
+            قمت بابتكار وبرمجة <strong>طبقة وسيطة مخصصة (Custom Command Translation Layer)</strong> تقف كبوابة أمنية وتنفيذية حتمية بين نموذج اللغة والمحركات، وتعمل عبر <strong>5 مراحل صارمة</strong>:
+          </p>
+
+          <!-- SVG Flowchart -->
+          <div style="background: #f8fafc; border: 1.5mm solid #cbd5e1; border-radius: 6mm; padding: 5mm; margin: 4mm 0;">
+            <svg viewBox="0 0 920 200" style="width: 100%; height: auto;" xmlns="http://www.w3.org/2000/svg">
+              <!-- Box 1 -->
+              <rect x="10" y="25" width="160" height="150" rx="8" fill="#ffffff" stroke="#94a3b8" stroke-width="2"/>
+              <rect x="10" y="25" width="160" height="32" rx="8" fill="#f1f5f9"/>
+              <text x="90" y="47" font-family="Cairo" font-size="12" font-weight="800" fill="#1e293b" text-anchor="middle">1. المستخدم والسياق</text>
+              <text x="90" y="90" font-family="Tajawal" font-size="11.5" font-weight="700" fill="#0f3b33" text-anchor="middle">طلب بلغة طبيعية</text>
+              <text x="90" y="115" font-family="JetBrains Mono" font-size="10" fill="#64748b" text-anchor="middle">+ مساحة العمل</text>
+              <text x="90" y="145" font-family="Tajawal" font-size="10.5" fill="#059669" text-anchor="middle">مهام ومستندات محلية</text>
+
+              <!-- Arrow 1 -->
+              <path d="M175 100 L 205 100" stroke="#059669" stroke-width="3" fill="none"/>
+              <polygon points="205,100 198,95 198,105" fill="#059669"/>
+
+              <!-- Box 2 -->
+              <rect x="210" y="25" width="160" height="150" rx="8" fill="#ffffff" stroke="#94a3b8" stroke-width="2"/>
+              <rect x="210" y="25" width="160" height="32" rx="8" fill="#0f766e"/>
+              <text x="290" y="47" font-family="Cairo" font-size="12" font-weight="800" fill="#ffffff" text-anchor="middle">2. نموذج الـ AI</text>
+              <text x="290" y="85" font-family="Cairo" font-size="11" font-weight="700" fill="#166534" text-anchor="middle">Ollama محلياً</text>
+              <text x="290" y="110" font-family="Tajawal" font-size="10" fill="#1e40af" text-anchor="middle">أو مزود سحابي مقيد</text>
+              <text x="290" y="145" font-family="Tajawal" font-size="10.5" font-weight="700" fill="#0f766e" text-anchor="middle">توليد الرد المشروط</text>
+
+              <!-- Arrow 2 -->
+              <path d="M375 100 L 405 100" stroke="#059669" stroke-width="3" fill="none"/>
+              <polygon points="405,100 398,95 398,105" fill="#059669"/>
+
+              <!-- Box 3: INNOVATION -->
+              <rect x="410" y="15" width="230" height="170" rx="10" fill="#ecfdf5" stroke="#10b981" stroke-width="3"/>
+              <rect x="410" y="15" width="230" height="36" rx="10" fill="#059669"/>
+              <text x="525" y="40" font-family="Cairo" font-size="13" font-weight="900" fill="#ffffff" text-anchor="middle">3. ابتكاري: طبقة الفحص والترجمة</text>
+              <text x="525" y="75" font-family="JetBrains Mono" font-size="10.5" font-weight="700" fill="#065f46" text-anchor="middle">Schema Enforcement</text>
+              <text x="525" y="100" font-family="Tajawal" font-size="11" fill="#1e293b" text-anchor="middle">تطبيع الأوامر لـ taskflow-actions</text>
+              <rect x="425" y="115" width="200" height="28" rx="5" fill="#fee2e2" stroke="#ef4444"/>
+              <text x="525" y="134" font-family="Cairo" font-size="10.5" font-weight="800" fill="#991b1b" text-anchor="middle">حظر الأوامر الشاذة والهلوسة 100%</text>
+              <text x="525" y="165" font-family="Tajawal" font-size="10" font-weight="700" fill="#047857" text-anchor="middle">النموذج لا يتحكم بالمحركات مباشرة</text>
+
+              <!-- Arrow 3 -->
+              <path d="M645 100 L 675 100" stroke="#1e3a8a" stroke-width="3" fill="none"/>
+              <polygon points="675,100 668,95 668,105" fill="#1e3a8a"/>
+
+              <!-- Box 4 -->
+              <rect x="680" y="25" width="230" height="150" rx="8" fill="#ffffff" stroke="#94a3b8" stroke-width="2"/>
+              <rect x="680" y="25" width="230" height="32" rx="8" fill="#1e3a8a"/>
+              <text x="795" y="47" font-family="Cairo" font-size="12" font-weight="800" fill="#ffffff" text-anchor="middle">4. المحركات التنفيذية المحلية</text>
+              <text x="795" y="80" font-family="Tajawal" font-size="11" font-weight="700" fill="#1e40af" text-anchor="middle">OpenCalque CAD (2D)</text>
+              <text x="795" y="105" font-family="Tajawal" font-size="11" font-weight="700" fill="#5b21b6" text-anchor="middle">Three.js 3D Rendering</text>
+              <text x="795" y="130" font-family="Tajawal" font-size="11" font-weight="700" fill="#059669" text-anchor="middle">OpenFilm + FFmpeg محلياً</text>
+              <text x="795" y="155" font-family="Tajawal" font-size="10.5" fill="#d97706" text-anchor="middle">تخزين ذري في SQLite</text>
+            </svg>
+          </div>
+
+          <!-- Modules grid -->
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6mm; margin-top: 4mm;">
+            <div style="background: #f8fafc; border: 1mm solid #cbd5e1; padding: 4mm 6mm; border-radius: 4mm;">
+              <strong style="color: var(--primary-mid); font-size: 13pt;">مخططات 2D و 3D:</strong>
+              <p style="font-size: 11.5pt; margin-top: 1mm; color: #475569;">دمج محرك OpenCalque، وابتكار محول هندسي ينشئ مشهد Three.js 3D من الجدران ثنائية الأبعاد فوراً.</p>
+            </div>
+            <div style="background: #f8fafc; border: 1mm solid #cbd5e1; padding: 4mm 6mm; border-radius: 4mm;">
+              <strong style="color: var(--primary-mid); font-size: 13pt;">استوديو الموشن والصوت:</strong>
+              <p style="font-size: 11.5pt; margin-top: 1mm; color: #475569;">تحليل الصوت محلياً عبر FFmpeg وتحديد فترات الصمت وإرسال الأرقام فقط للنموذج لحماية الخصوصية.</p>
+            </div>
+            <div style="background: #f8fafc; border: 1mm solid #cbd5e1; padding: 4mm 6mm; border-radius: 4mm;">
+              <strong style="color: var(--primary-mid); font-size: 13pt;">حزمة Inno المحمولة:</strong>
+              <p style="font-size: 11.5pt; margin-top: 1mm; color: #475569;">تثبيت فوري على Windows 10/11 يضم بايثون ونود وبن، ولا يتطلب أي أوامر تيرمينال أو إنترنت.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6. تحليل البيانات والإحصاءات والرسوم البيانية -->
+      <div class="card" style="flex: 1.15;">
+        <div class="card-header">
+          <div class="card-num">06</div>
+          <div>
+            <div class="card-title">تحليل البيانات والنتائج التجريبية بالأشكال البيانية</div>
+            <div class="card-subtitle">QUANTITATIVE BENCHMARKS &amp; SCIENTIFIC CHARTS</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <p>
+            أجريت تجارب معملية مكثفة على جهازي لقياس الأداء الحقيقي بالأرقام:
+          </p>
+
+          <!-- Charts Row 1 -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8mm;">
+            <div class="chart-container">
+              <img src="charts/chart_accuracy_comparison.png" alt="مقارنة دقة تنفيذ الأوامر ومعدل الأخطاء">
+            </div>
+            <div class="chart-container">
+              <img src="charts/chart_fuzzing_security.png" alt="اختبارات حقن البيانات الشاذة">
+            </div>
+          </div>
+
+          <!-- Charts Row 2 -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8mm; margin-top: 4mm;">
+            <div class="chart-container">
+              <img src="charts/chart_latency_breakdown.png" alt="زمن المعالجة في طبقة الوسيط">
+            </div>
+            <div class="chart-container">
+              <img src="charts/chart_cost_comparison.png" alt="الجدوى الاقتصادية ومقارنة التكلفة السنوية">
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ==================== LEFT PANEL: 35 CM (النتائج والتطبيقات والمراجع) ==================== -->
+    <section class="panel">
+
+      <!-- 7. النتائج الهندسية -->
+      <div class="card" style="flex: 1.15;">
+        <div class="card-header">
+          <div class="card-num">07</div>
+          <div>
+            <div class="card-title">النتائج الهندسية والخلاصة</div>
+            <div class="card-subtitle">ENGINEERING RESULTS &amp; FINDINGS</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <p>أثبتت نتائج الاختبارات العملية نجاح النموذج الأولي في تحقيق أهدافه:</p>
+          <ul class="real-list">
+            <li><strong>تحقيق الحتمية الكاملة:</strong> بلغت دقة ترجمة وتنفيذ الأوامر <strong>99.4%</strong> مقارنة بـ 64.2% للنماذج غير المقيدة.</li>
+            <li><strong>القضاء التام على مخاطر الهلوسة:</strong> حظر 500 عينة مشوهة بنسبة نجاح <strong>100%</strong> دون أي انهيار للنظام.</li>
+            <li><strong>سرعة استجابة فورية:</strong> زمن فحص وتطبيع الأمر في طبقة الوسيط بلغ <strong>34.6 ميلي ثانية</strong> فقط.</li>
+            <li><strong>الاستقلالية عن السحابة:</strong> عمل المنظومة بالكامل في وضع انقطاع الإنترنت التام بنجاح كامل.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- 8. التطبيقات الواقعية والجدوى الاقتصادية -->
+      <div class="card" style="flex: 1;">
+        <div class="card-header">
+          <div class="card-num">08</div>
+          <div>
+            <div class="card-title">التطبيقات على أرض الواقع والتكلفة</div>
+            <div class="card-subtitle">APPLICATIONS &amp; ECONOMIC IMPACT</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <ul class="real-list">
+            <li><strong>المدارس ومعامل الحاسب:</strong> تمكين الطلاب من التدرب على هندسة البرمجيات والتصميم بالـ AI دون الحاجة لاشتراكات مدفوعة أو إنترنت سريع.</li>
+            <li><strong>المكاتب الهندسية وقطاعات التصميم:</strong> حماية الملكية الفكرية والرسومات المعمارية من التسريب للخوادم السحابية الخارجية.</li>
+            <li><strong>التكلفة الاقتصادية ($0):</strong> توفير ما يزيد عن <strong>1200$ سنوياً للمستخدم الواحد</strong> مقارنة باشتراكات المنصات التجارية (Jira + Canva + Notion).</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- 9. الدراسات المستقبلية والتطوير -->
+      <div class="card" style="flex: 0.95;">
+        <div class="card-header">
+          <div class="card-num">09</div>
+          <div>
+            <div class="card-title">الدراسة المستقبلية والتوصيات</div>
+            <div class="card-subtitle">FUTURE WORK &amp; ROADMAP</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <ul class="real-list">
+            <li><strong>تضمين نماذج فائقة الصغر (Edge SLMs):</strong> دمج نماذج مثل Phi-3 Mini داخل المثبت لتعمل فوراً دون تنصيب Ollama.</li>
+            <li><strong>دعم بروتوكول Model Context Protocol:</strong> لتوصيل النظام بأدوات برمجية عالمية بنفس معايير الحتمية.</li>
+            <li><strong>دراسة تجربة المستخدم (UX Study):</strong> قياس نسب توفير الوقت الفعلي على عينة طلابية ومهندسين تزيد عن 200 مستخدم.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- 10. المصادر والمراجع العلمية -->
+      <div class="card" style="flex: 0.9;">
+        <div class="card-header">
+          <div class="card-num">10</div>
+          <div>
+            <div class="card-title">المصادر والمراجع العلمية</div>
+            <div class="card-subtitle">REFERENCES &amp; CITATIONS</div>
+          </div>
+        </div>
+        <div class="card-body" style="font-size: 11pt; line-height: 1.45; color: #475569;">
+          <p>1. Tiangolo, S. (2024). <em>FastAPI Framework Documentation</em>. fastapi.tiangolo.com</p>
+          <p>2. Colvin, S. et al. (2024). <em>Pydantic Runtime Type Enforcement</em>. docs.pydantic.dev</p>
+          <p>3. Python Cryptography Auth. (2023). <em>Fernet Symmetric Specification</em>. cryptography.io</p>
+          <p>4. Hipp, D. R. (2024). <em>SQLite Embedded Relational Engine</em>. sqlite.org</p>
+          <p>5. OpenCalque CAD Project. (2024). <em>Open-source CAD Toolkit (MIT)</em>.</p>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="poster-footer">
+    <div>مشروع AI TaskFlow: OpenFilm Edition • إعداد وتصميم الطالب: آدم محمود عبد العليم (Adam Mahmoud Abdelalim)</div>
+    <div>المقاس القياسي: 140 سم عرض × 120 سم ارتفاع (35 سم يمين | 70 سم وسط | 35 سم يسار) • معايير ISEF لمسار التصميم الهندسي</div>
+    <div>جميع الاختبارات والقياسات الرقمية وخوارزمية الربط والتطبيع مبرمجة ومحققة بالكامل من إعداد الباحث المستقل</div>
+  </footer>
+
+</div>
+
+</body>
+</html>

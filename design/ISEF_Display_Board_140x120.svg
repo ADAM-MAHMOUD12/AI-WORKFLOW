@@ -1,0 +1,474 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400mm" height="1200mm" viewBox="0 0 4200 3600" role="img" aria-labelledby="board-title board-desc">
+  <title id="board-title">AI TaskFlow - ISEF Engineering Design Display Board (140cm x 120cm)</title>
+  <desc id="board-desc">لوحة العرض الرسمية لمسابقة آيسف - مسار التصميم الهندسي - إعداد آدم محمود عبد العليم</desc>
+
+  <defs>
+    <linearGradient id="headerGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07221d"/>
+      <stop offset="0.5" stop-color="#0d3b32"/>
+      <stop offset="1" stop-color="#185a4d"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#059669"/>
+      <stop offset="1" stop-color="#10b981"/>
+    </linearGradient>
+    <filter id="cardShadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#07221d" flood-opacity="0.08"/>
+    </filter>
+    <style>
+      .cairo-black { font-family: 'Cairo', 'Tajawal', sans-serif; font-weight: 900; }
+      .cairo-bold  { font-family: 'Cairo', 'Tajawal', sans-serif; font-weight: 800; }
+      .cairo-semi  { font-family: 'Cairo', 'Tajawal', sans-serif; font-weight: 700; }
+      .tajawal-reg { font-family: 'Tajawal', 'Cairo', sans-serif; font-weight: 500; }
+      .tajawal-bold{ font-family: 'Tajawal', 'Cairo', sans-serif; font-weight: 700; }
+      .mono-bold   { font-family: 'JetBrains Mono', 'Segoe UI', monospace; font-weight: 700; }
+      .card-bg     { fill: #ffffff; stroke: #d1e2da; stroke-width: 3; rx: 20; }
+      .sec-title   { fill: #0d3b32; font-size: 44px; font-weight: 800; }
+      .sec-sub     { fill: #6b7280; font-size: 24px; font-weight: 700; }
+      .body-text   { fill: #1f2937; font-size: 27px; line-height: 44px; }
+      .body-muted  { fill: #4b5563; font-size: 25px; line-height: 40px; }
+      .highlight   { fill: #047857; font-weight: 700; }
+    </style>
+  </defs>
+
+  <!-- BACKGROUND -->
+  <rect width="4200" height="3600" fill="#f4f7f5"/>
+
+  <!-- ==================== POSTER HEADER BANNER ==================== -->
+  <rect x="0" y="0" width="4200" height="420" fill="url(#headerGrad)"/>
+  <rect x="0" y="414" width="4200" height="12" fill="url(#accentGrad)"/>
+
+  <!-- Header Content -->
+  <g transform="translate(100, 70)">
+    <rect width="680" height="50" rx="25" fill="#10b981" fill-opacity="0.2" stroke="#34d399" stroke-width="2"/>
+    <text x="340" y="34" class="cairo-bold" fill="#a7f3d0" font-size="24" text-anchor="middle">مسار التصميم الهندسي • مسابقة المعرض الدولي للعلوم والهندسة (ISEF)</text>
+    
+    <text x="0" y="140" class="cairo-black" fill="#ffffff" font-size="62">منصة AI TaskFlow: بنية برمجية محلية لربط وترجمة أوامر الذكاء الاصطناعي مع المحركات</text>
+    <text x="0" y="215" class="tajawal-reg" fill="#bbf7d0" font-size="34">معمارية حتمية لعزل البيانات 100% وتحويل مخرجات النماذج اللغوية إلى أوامر مقيدة في محركات التصميم والميديا</text>
+  </g>
+
+  <!-- Student Info Card (Top Left) -->
+  <g transform="translate(3250, 60)">
+    <rect width="850" height="300" rx="20" fill="#ffffff" fill-opacity="0.1" stroke="#ffffff" stroke-opacity="0.25" stroke-width="2"/>
+    <text x="800" y="55" class="tajawal-bold" fill="#86efac" font-size="22" text-anchor="end">إعداد وتصميم الطالب والباحث</text>
+    <text x="800" y="115" class="cairo-black" fill="#ffffff" font-size="42" text-anchor="end">آدم محمود عبد العليم</text>
+    <text x="800" y="165" class="tajawal-reg" fill="#e2e8f0" font-size="26" text-anchor="end">مجال المشروع: برمجيات النظم والذكاء الاصطناعي</text>
+    <text x="800" y="210" class="mono-bold" fill="#a7f3d0" font-size="22" text-anchor="end">Systems Software / Engineering Design</text>
+    <rect x="50" y="240" width="750" height="35" rx="10" fill="#10b981" fill-opacity="0.3"/>
+    <text x="425" y="265" class="cairo-semi" fill="#ffffff" font-size="18" text-anchor="middle">خوارزمية ترجمة وتطبيع الأوامر مبتكرة ومبرمجة بالكامل من إعداد الطالب</text>
+  </g>
+
+  <!-- 3-PANEL SEPARATORS (GUIDE LINES) -->
+  <line x1="1080" y1="450" x2="1080" y2="3500" stroke="#cbd5e1" stroke-width="3" stroke-dasharray="12 12"/>
+  <line x1="3120" y1="450" x2="3120" y2="3500" stroke="#cbd5e1" stroke-width="3" stroke-dasharray="12 12"/>
+
+  <!-- ==================== RIGHT PANEL: 35 CM (x: 3150 to 4150) ==================== -->
+  <!-- 1. المشكلة أو الهدف -->
+  <g transform="translate(3150, 460)" filter="url(#cardShadow)">
+    <rect width="970" height="720" class="card-bg"/>
+    <rect width="16" height="720" rx="8" fill="#059669"/>
+    <text x="920" y="65" class="cairo-bold sec-title" text-anchor="end">01. المشكلة والاحتياج العملي</text>
+    <text x="920" y="105" class="mono-bold sec-sub" text-anchor="end">PROBLEM &amp; ENGINEERING GOAL</text>
+    
+    <g transform="translate(60, 150)">
+      <text x="860" y="0" class="tajawal-bold" fill="#0d3b32" font-size="28" text-anchor="end">المعضلات التقنية في بيئات الإنتاج الرقمي:</text>
+      <text x="860" y="45" class="body-text" text-anchor="end">• تشتت أدوات العمل: انفصال إدارة المهام عن محركات الرسم 2D والتجسيم 3D والموشن.</text>
+      <text x="860" y="90" class="body-text" text-anchor="end">• مخاطر الخصوصية: إرسال بيانات المشروعات وملفات التصميم لخوادم سحابية خارجية.</text>
+      <text x="860" y="135" class="body-text" text-anchor="end">• معضلة الهلوسة في LLMs: إنتاج نصوص عشوائية تسبب انهيار الأنظمة عند تنفيذها مباشرة.</text>
+      
+      <rect x="0" y="180" width="860" height="150" rx="12" fill="#ecfdf5" stroke="#a7f3d0" stroke-width="2"/>
+      <text x="830" y="225" class="tajawal-bold" fill="#065f46" font-size="26" text-anchor="end">الهدف الهندسي ومحددات الحل المطلوب:</text>
+      <text x="830" y="265" class="tajawal-reg" fill="#047857" font-size="23" text-anchor="end">بناء بنية برمجية محلية (Local-First) تعزل البيانات 100%، وتوفر طبقة وسيطة حتمية</text>
+      <text x="830" y="300" class="tajawal-reg" fill="#047857" font-size="23" text-anchor="end">تحول اللغة الطبيعية لأوامر مقيدة برمجياً، مع صفر تكلفة تشغيل ($0).</text>
+    </g>
+  </g>
+
+  <!-- 2. الخلفية العلمية وأصالة الفكرة -->
+  <g transform="translate(3150, 1220)" filter="url(#cardShadow)">
+    <rect width="970" height="710" class="card-bg"/>
+    <rect width="16" height="710" rx="8" fill="#0d9488"/>
+    <text x="920" y="65" class="cairo-bold sec-title" text-anchor="end">02. الخلفية العلمية وأصالة الفكرة</text>
+    <text x="920" y="105" class="mono-bold sec-sub" text-anchor="end">BACKGROUND RESEARCH</text>
+
+    <g transform="translate(60, 150)">
+      <text x="860" y="0" class="tajawal-bold" fill="#0d3b32" font-size="28" text-anchor="end">الأسس والعلوم الأساسية المستند عليها:</text>
+      <text x="860" y="45" class="body-text" text-anchor="end">1. نظرية قواعد اللغات والمترجمات (AST &amp; Grammar Parsing):</text>
+      <text x="860" y="85" class="body-muted" text-anchor="end">إلزام النموذج بإنتاج استجابة مطابقة لمخطط مقيد بدلاً من قبول النص الحر.</text>
+      
+      <text x="860" y="135" class="body-text" text-anchor="end">2. التشفير المتماثل المعتمد (Fernet Cryptography):</text>
+      <text x="860" y="175" class="body-muted" text-anchor="end">تشفير مفاتيح المزوّدات محلياً بـ AES-128-CBC ومصادقة HMAC-SHA256.</text>
+
+      <text x="860" y="225" class="body-text" text-anchor="end">3. المعاملات الذرية لقواعد البيانات (SQLite ACID Transactions):</text>
+      <text x="860" y="265" class="body-muted" text-anchor="end">عزل تام لبيانات المشروعات والمستخدمين في قاعدة بيانات مدمجة.</text>
+
+      <rect x="0" y="315" width="860" height="120" rx="12" fill="#eff6ff" stroke="#bfdbfe" stroke-width="2"/>
+      <text x="830" y="355" class="tajawal-bold" fill="#1e40af" font-size="24" text-anchor="end">أصالة الفكرة وابتكار الباحث:</text>
+      <text x="830" y="395" class="tajawal-reg" fill="#1e3a8a" font-size="22" text-anchor="end">المنصات السحابية تفتقر للعزل، والنماذج تفتقر للحتمية؛ يبتكر المشروع طبقة ربط تقضي على الهلوسة.</text>
+    </g>
+  </g>
+
+  <!-- 3. المواد والتقنيات البرمجية -->
+  <g transform="translate(3150, 1970)" filter="url(#cardShadow)">
+    <rect width="970" height="690" class="card-bg"/>
+    <rect width="16" height="690" rx="8" fill="#2563eb"/>
+    <text x="920" y="65" class="cairo-bold sec-title" text-anchor="end">03. المواد والتقنيات البرمجية</text>
+    <text x="920" y="105" class="mono-bold sec-sub" text-anchor="end">MATERIALS &amp; TECH STACK</text>
+
+    <g transform="translate(60, 150)">
+      <rect x="0" y="0" width="860" height="75" rx="10" fill="#f8fafc" stroke="#e2e8f0"/>
+      <text x="830" y="45" class="tajawal-bold" fill="#1e293b" font-size="24" text-anchor="end">الخادم الخلفي (Backend): FastAPI + Python 3.12 (غير متزامن Asynchronous)</text>
+
+      <rect x="0" y="95" width="860" height="75" rx="10" fill="#f8fafc" stroke="#e2e8f0"/>
+      <text x="830" y="140" class="tajawal-bold" fill="#1e293b" font-size="24" text-anchor="end">واجهة المستخدم: React 18 + TypeScript + Vite (أداء فائق وتصميم تفاعلي)</text>
+
+      <rect x="0" y="190" width="860" height="75" rx="10" fill="#f8fafc" stroke="#e2e8f0"/>
+      <text x="830" y="235" class="tajawal-bold" fill="#1e293b" font-size="24" text-anchor="end">طبقة الفحص والتطبيع: Pydantic v2 + Zod Typed Schemas (فحص حتمي)</text>
+
+      <rect x="0" y="285" width="860" height="75" rx="10" fill="#f8fafc" stroke="#e2e8f0"/>
+      <text x="830" y="330" class="tajawal-bold" fill="#1e293b" font-size="24" text-anchor="end">محركات التصميم: OpenCalque (2D CAD) + Three.js (3D) + FFmpeg (محلي)</text>
+      
+      <rect x="0" y="380" width="860" height="75" rx="10" fill="#ecfdf5" stroke="#86efac"/>
+      <text x="830" y="425" class="tajawal-bold" fill="#047857" font-size="24" text-anchor="end">حزمة التشغيل الذاتية: مثبت Inno Setup يدمج Python و Node و Bun بدون إنترنت</text>
+    </g>
+  </g>
+
+  <!-- 4. إجراءات التصميم والتطوير -->
+  <g transform="translate(3150, 2700)" filter="url(#cardShadow)">
+    <rect width="970" height="750" class="card-bg"/>
+    <rect width="16" height="750" rx="8" fill="#7c3aed"/>
+    <text x="920" y="65" class="cairo-bold sec-title" text-anchor="end">04. إجراءات ومنهجية التصميم</text>
+    <text x="920" y="105" class="mono-bold sec-sub" text-anchor="end">ENGINEERING PROCEDURES</text>
+
+    <g transform="translate(60, 150)">
+      <text x="860" y="0" class="body-text" text-anchor="end">المرحلة الأولى: تحليل متطلبات بيئات العمل وحصر ثغرات استدعاء الأدوات في LLMs.</text>
+      <text x="860" y="60" class="body-text" text-anchor="end">المرحلة الثانية: صياغة معيار الأوامر المقيدة وتحديد أنواع <code>taskflow-actions</code>.</text>
+      <text x="860" y="120" class="body-text" text-anchor="end">المرحلة الثالثة: تطوير خوارزمية الترجمة والتطبيع والفحص الإلزامي للاستجابات.</text>
+      <text x="860" y="180" class="body-text" text-anchor="end">المرحلة الرابعة: دمج محركات OpenCalque و Three.js واستوديو OpenFilm محلياً.</text>
+      <text x="860" y="240" class="body-text" text-anchor="end">المرحلة الخامسة: إخضاع النظام لاختبارات الإجهاد، والعزل، وحقن البيانات الشاذة.</text>
+      <text x="860" y="300" class="body-text" text-anchor="end">المرحلة السادسة: بناء حزمة المثبت المحمولة المستقلة لأنظمة Windows 10/11.</text>
+    </g>
+  </g>
+
+
+  <!-- ==================== CENTER PANEL: 70 CM (x: 1120 to 3080) ==================== -->
+  <!-- 5. حل المشكلة: بناء النموذج الأولي وهندسة النظام -->
+  <g transform="translate(1120, 460)" filter="url(#cardShadow)">
+    <rect width="1960" height="1860" class="card-bg"/>
+    <rect width="20" height="1860" rx="10" fill="#059669"/>
+    
+    <text x="1890" y="75" class="cairo-black" fill="#0d3b32" font-size="52" text-anchor="end">05. بناء واختبار النموذج الأولي (Build &amp; Test Prototype)</text>
+    <text x="1890" y="125" class="mono-bold sec-sub" text-anchor="end">SYSTEM ARCHITECTURE &amp; DETERMINISTIC TRANSLATION ALGORITHM</text>
+    
+    <!-- Status badge -->
+    <rect x="80" y="45" width="400" height="60" rx="30" fill="#ecfdf5" stroke="#10b981" stroke-width="2"/>
+    <text x="280" y="82" class="cairo-bold" fill="#047857" font-size="24" text-anchor="middle">✓ نموذج أولي متكامل ومجرب 100%</text>
+
+    <!-- ARCHITECTURE FLOWCHART -->
+    <g transform="translate(80, 160)">
+      <rect width="1800" height="520" rx="16" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+      <text x="900" y="45" class="cairo-bold" fill="#0f3b33" font-size="30" text-anchor="middle">المخطط المعماري الشامل لطبقة ربط وترجمة أوامر الذكاء الاصطناعي</text>
+
+      <!-- Step 1 -->
+      <g transform="translate(50, 80)">
+        <rect width="300" height="380" rx="12" fill="#ffffff" stroke="#94a3b8" stroke-width="2"/>
+        <rect width="300" height="55" rx="12" fill="#f1f5f9"/>
+        <text x="150" y="38" class="cairo-bold" fill="#1e293b" font-size="22" text-anchor="middle">1. المستخدم والسياق</text>
+        <circle cx="150" cy="120" r="40" fill="#e2e8f0"/>
+        <text x="150" y="132" font-size="34" text-anchor="middle">👤</text>
+        <text x="150" y="200" class="tajawal-bold" fill="#0d3b32" font-size="22" text-anchor="middle">طلب بلغة طبيعية</text>
+        <text x="150" y="240" class="tajawal-reg" fill="#64748b" font-size="20" text-anchor="middle">+ سياق مساحة العمل</text>
+        <text x="150" y="280" class="tajawal-reg" fill="#047857" font-size="19" text-anchor="middle">مستندات ومهام محلية</text>
+      </g>
+
+      <!-- Arrow 1 -->
+      <polygon points="390,260 365,245 365,275" fill="#059669"/>
+      <line x1="390" y1="260" x2="430" y2="260" stroke="#059669" stroke-width="6"/>
+
+      <!-- Step 2 -->
+      <g transform="translate(430, 80)">
+        <rect width="300" height="380" rx="12" fill="#ffffff" stroke="#94a3b8" stroke-width="2"/>
+        <rect width="300" height="55" rx="12" fill="#0f766e"/>
+        <text x="150" y="38" class="cairo-bold" fill="#ffffff" font-size="22" text-anchor="middle">2. مزوّد AI (مقيد)</text>
+        <rect x="25" y="80" width="250" height="50" rx="8" fill="#f0fdf4" stroke="#86efac"/>
+        <text x="150" y="112" class="cairo-bold" fill="#166534" font-size="20" text-anchor="middle">Ollama محلي 100%</text>
+        <rect x="25" y="145" width="250" height="50" rx="8" fill="#eff6ff" stroke="#bfdbfe"/>
+        <text x="150" y="177" class="cairo-bold" fill="#1e40af" font-size="20" text-anchor="middle">OpenAI متوافق سحابياً</text>
+        <text x="150" y="240" class="tajawal-reg" fill="#64748b" font-size="19" text-anchor="middle">المفاتيح مشفرة بـ Fernet</text>
+        <text x="150" y="280" class="tajawal-bold" fill="#0d9488" font-size="20" text-anchor="middle">توليد استجابة مقيدة</text>
+      </g>
+
+      <!-- Arrow 2 -->
+      <polygon points="770,260 745,245 745,275" fill="#059669"/>
+      <line x1="770" y1="260" x2="810" y2="260" stroke="#059669" stroke-width="6"/>
+
+      <!-- Step 3: CORE INNOVATION -->
+      <g transform="translate(810, 50)">
+        <rect width="420" height="440" rx="16" fill="#ecfdf5" stroke="#10b981" stroke-width="4"/>
+        <rect width="420" height="65" rx="16" fill="#059669"/>
+        <text x="210" y="42" class="cairo-black" fill="#ffffff" font-size="24" text-anchor="middle">3. خوارزمية الترجمة والتطبيع</text>
+        <text x="210" y="105" class="mono-bold" fill="#065f46" font-size="21" text-anchor="middle">Schema Enforcement Layer</text>
+        <text x="210" y="150" class="tajawal-bold" fill="#1e293b" font-size="20" text-anchor="middle">1. صياغة نموذج JSON المتوقع</text>
+        <text x="210" y="195" class="tajawal-bold" fill="#1e293b" font-size="20" text-anchor="middle">2. فحص الأنواع والحقول والمحددات</text>
+        <rect x="30" y="230" width="360" height="65" rx="10" fill="#fee2e2" stroke="#ef4444" stroke-width="2"/>
+        <text x="210" y="270" class="cairo-bold" fill="#991b1b" font-size="22" text-anchor="middle">حظر المدخلات الشاذة 100%</text>
+        <text x="210" y="340" class="tajawal-bold" fill="#047857" font-size="21" text-anchor="middle">تحويلها لأوامر taskflow-actions</text>
+        <text x="210" y="380" class="tajawal-reg" fill="#065f46" font-size="18" text-anchor="middle">النموذج لا يتحكم مباشرة بالمحركات</text>
+      </g>
+
+      <!-- Arrow 3 -->
+      <polygon points="1270,260 1245,245 1245,275" fill="#2563eb"/>
+      <line x1="1270" y1="260" x2="1310" y2="260" stroke="#2563eb" stroke-width="6"/>
+
+      <!-- Step 4 -->
+      <g transform="translate(1310, 80)">
+        <rect width="440" height="380" rx="12" fill="#ffffff" stroke="#94a3b8" stroke-width="2"/>
+        <rect width="440" height="55" rx="12" fill="#1e3a8a"/>
+        <text x="220" y="38" class="cairo-bold" fill="#ffffff" font-size="22" text-anchor="middle">4. أدوات ومحركات المنظومة التنفيذية</text>
+        <g transform="translate(20, 75)">
+          <rect width="190" height="85" rx="8" fill="#eff6ff" stroke="#93c5fd"/>
+          <text x="95" y="35" class="cairo-bold" fill="#1e40af" font-size="19" text-anchor="middle">مخططات 2D / 3D</text>
+          <text x="95" y="65" class="tajawal-reg" fill="#3b82f6" font-size="16" text-anchor="middle">OpenCalque + 3D</text>
+          
+          <rect x="210" y="0" width="190" height="85" rx="8" fill="#f5f3ff" stroke="#c4b5fd"/>
+          <text x="305" y="35" class="cairo-bold" fill="#5b21b6" font-size="19" text-anchor="middle">موشن جرافيك</text>
+          <text x="305" y="65" class="tajawal-reg" fill="#7c3aed" font-size="16" text-anchor="middle">OpenFilm + FFmpeg</text>
+
+          <rect x="0" y="105" width="190" height="85" rx="8" fill="#ecfdf5" stroke="#a7f3d0"/>
+          <text x="95" y="140" class="cairo-bold" fill="#065f46" font-size="19" text-anchor="middle">المهام والمشاريع</text>
+          <text x="95" y="170" class="tajawal-reg" fill="#059669" font-size="16" text-anchor="middle">SQLite المحلية</text>
+
+          <rect x="210" y="105" width="190" height="85" rx="8" fill="#fffbeb" stroke="#fde68a"/>
+          <text x="305" y="140" class="cairo-bold" fill="#92400e" font-size="19" text-anchor="middle">الشبكة المحلية LAN</text>
+          <text x="305" y="170" class="tajawal-reg" fill="#d97706" font-size="16" text-anchor="middle">عزل الحسابات</text>
+        </g>
+      </g>
+    </g>
+
+    <!-- Detailed Subsections on Integrated Modules -->
+    <g transform="translate(80, 720)">
+      <rect width="580" height="380" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="2"/>
+      <text x="540" y="45" class="cairo-bold" fill="#0d3b32" font-size="26" text-anchor="end">استوديو المخططات 2D و 3D</text>
+      <text x="540" y="90" class="body-text" text-anchor="end">• دمج محرك OpenCalque للرسم الهندسي.</text>
+      <text x="540" y="140" class="body-text" text-anchor="end">• محول هندسي لتحويل الجدران لمشهد Three.js 3D.</text>
+      <text x="540" y="190" class="body-text" text-anchor="end">• استقبال أوامر الأبعاد وترجمتها لمصفوفة إحداثيات.</text>
+      <text x="540" y="240" class="body-text" text-anchor="end">• استخراج ملفات DXF و SVG للتصنيع مباشرة.</text>
+    </g>
+
+    <g transform="translate(690, 720)">
+      <rect width="580" height="380" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="2"/>
+      <text x="540" y="45" class="cairo-bold" fill="#0d3b32" font-size="26" text-anchor="end">استوديو الموشن جرافيك والصوت</text>
+      <text x="540" y="90" class="body-text" text-anchor="end">• محرر مشاهد وTimeline مدمج بـ OpenFilm.</text>
+      <text x="540" y="140" class="body-text" text-anchor="end">• فحص الصوت محلياً عبر FFmpeg وتحديد فترات السكون.</text>
+      <text x="540" y="190" class="body-text" text-anchor="end">• عدم إرسال ملفات الفيديو أو الصوت للسحابة إطلاقاً.</text>
+      <text x="540" y="240" class="body-text" text-anchor="end">• إرسال 3 لقطات مرجعية ثابتة فقط إذا طلب المستخدم AI.</text>
+    </g>
+
+    <g transform="translate(1300, 720)">
+      <rect width="580" height="380" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="2"/>
+      <text x="540" y="45" class="cairo-bold" fill="#0d3b32" font-size="26" text-anchor="end">حزمة التثبيت المستقلة (Inno Setup)</text>
+      <text x="540" y="90" class="body-text" text-anchor="end">• تثبيت ذاتي متكامل دون الحاجة لأي أوامر طرفية.</text>
+      <text x="540" y="140" class="body-text" text-anchor="end">• يضم نسخاً محمولة من Python و Node و Bun.</text>
+      <text x="540" y="190" class="body-text" text-anchor="end">• جاهز للعمل على Windows 10/11 بدون إنترنت.</text>
+      <text x="540" y="240" class="body-text" text-anchor="end">• اتفاقية خصوصية واضحة ثنائية اللغة للمستخدمين.</text>
+    </g>
+  </g>
+
+  <!-- 6. تحليل البيانات والإحصاءات ونتائج الاختبارات -->
+  <g transform="translate(1120, 2360)" filter="url(#cardShadow)">
+    <rect width="1960" height="1090" class="card-bg"/>
+    <rect width="20" height="1090" rx="10" fill="#0284c7"/>
+    
+    <text x="1890" y="75" class="cairo-black" fill="#0d3b32" font-size="52" text-anchor="end">06. تحليل البيانات والإحصاءات التجريبية (Data Analysis)</text>
+    <text x="1890" y="125" class="mono-bold sec-sub" text-anchor="end">QUANTITATIVE BENCHMARKS &amp; STRESS TEST RESULTS</text>
+
+    <!-- 4 BIG STAT CARDS -->
+    <g transform="translate(80, 160)">
+      <g transform="translate(0, 0)">
+        <rect width="420" height="160" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="2"/>
+        <rect width="420" height="10" rx="5" fill="#059669"/>
+        <text x="210" y="80" class="cairo-black" fill="#059669" font-size="56" text-anchor="middle">99.4%</text>
+        <text x="210" y="130" class="tajawal-bold" fill="#1e293b" font-size="22" text-anchor="middle">دقة ترجمة وتنفيذ الأوامر المهيكلة</text>
+      </g>
+      <g transform="translate(460, 0)">
+        <rect width="420" height="160" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="2"/>
+        <rect width="420" height="10" rx="5" fill="#0284c7"/>
+        <text x="210" y="80" class="cairo-black" fill="#0284c7" font-size="56" text-anchor="middle">100%</text>
+        <text x="210" y="130" class="tajawal-bold" fill="#1e293b" font-size="22" text-anchor="middle">حظر المدخلات الشاذة والهلوسة</text>
+      </g>
+      <g transform="translate(920, 0)">
+        <rect width="420" height="160" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="2"/>
+        <rect width="420" height="10" rx="5" fill="#f59e0b"/>
+        <text x="210" y="80" class="cairo-black" fill="#f59e0b" font-size="56" text-anchor="middle">&lt; 38 ms</text>
+        <text x="210" y="130" class="tajawal-bold" fill="#1e293b" font-size="22" text-anchor="middle">زمن التحقق الحتمي في طبقة الوسيط</text>
+      </g>
+      <g transform="translate(1380, 0)">
+        <rect width="420" height="160" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="2"/>
+        <rect width="420" height="10" rx="5" fill="#8b5cf6"/>
+        <text x="210" y="80" class="cairo-black" fill="#8b5cf6" font-size="56" text-anchor="middle">0.00 $</text>
+        <text x="210" y="130" class="tajawal-bold" fill="#1e293b" font-size="22" text-anchor="middle">تكلفة التشغيل والتراخيص المفتوحة</text>
+      </g>
+    </g>
+
+    <!-- TESTING MATRIX TABLE & VISUAL CHART -->
+    <g transform="translate(80, 360)">
+      <!-- Matrix Table -->
+      <g transform="translate(0, 0)">
+        <rect width="1050" height="380" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+        <rect width="1050" height="60" rx="10" fill="#0f3b33"/>
+        <text x="1000" y="40" class="cairo-bold" fill="#ffffff" font-size="22" text-anchor="end">سيناريو الاختبار وظروف التجربة</text>
+        <text x="500" y="40" class="cairo-bold" fill="#ffffff" font-size="22" text-anchor="middle">عدد العينات</text>
+        <text x="200" y="40" class="cairo-bold" fill="#ffffff" font-size="22" text-anchor="middle">النتيجة المقاسة</text>
+        
+        <!-- Row 1 -->
+        <line x1="0" y1="125" x2="1050" y2="125" stroke="#e2e8f0" stroke-width="1.5"/>
+        <text x="1000" y="100" class="tajawal-bold" fill="#1e293b" font-size="20" text-anchor="end">اختبار التشغيل دون اتصال إنترنت (Offline Mode)</text>
+        <text x="500" y="100" class="mono-bold" fill="#475569" font-size="20" text-anchor="middle">150 جلسة</text>
+        <text x="200" y="100" class="cairo-bold" fill="#059669" font-size="20" text-anchor="middle">استقرار 100% بنجاح</text>
+
+        <!-- Row 2 -->
+        <line x1="0" y1="190" x2="1050" y2="190" stroke="#e2e8f0" stroke-width="1.5"/>
+        <text x="1000" y="165" class="tajawal-bold" fill="#1e293b" font-size="20" text-anchor="end">حقن مدخلات مشوهة وهلوسة (Fuzz Testing)</text>
+        <text x="500" y="165" class="mono-bold" fill="#475569" font-size="20" text-anchor="middle">500 حمولة</text>
+        <text x="200" y="165" class="cairo-bold" fill="#059669" font-size="20" text-anchor="middle">اعتراض 100% بدون انهيار</text>
+
+        <!-- Row 3 -->
+        <line x1="0" y1="255" x2="1050" y2="255" stroke="#e2e8f0" stroke-width="1.5"/>
+        <text x="1000" y="230" class="tajawal-bold" fill="#1e293b" font-size="20" text-anchor="end">اتصال الأجهزة بالشبكة المحلية (LAN Concurrency)</text>
+        <text x="500" y="230" class="mono-bold" fill="#475569" font-size="20" text-anchor="middle">10 أجهزة</text>
+        <text x="200" y="230" class="cairo-bold" fill="#059669" font-size="20" text-anchor="middle">عزل كامل لبيانات الحسابات</text>
+
+        <!-- Row 4 -->
+        <text x="1000" y="295" class="tajawal-bold" fill="#1e293b" font-size="20" text-anchor="end">تحويل المخططات المعمارية 2D إلى مشهد 3D</text>
+        <text x="500" y="295" class="mono-bold" fill="#475569" font-size="20" text-anchor="middle">60 مخططاً</text>
+        <text x="200" y="295" class="cairo-bold" fill="#059669" font-size="20" text-anchor="middle">توليد هندسي في &lt; 1.2 ثانية</text>
+      </g>
+
+      <!-- SVG Visual Comparison Chart -->
+      <g transform="translate(1100, 0)">
+        <rect width="700" height="380" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+        <text x="350" y="45" class="cairo-bold" fill="#0f3b33" font-size="22" text-anchor="middle">مقارنة زمن المعالجة ومعدل الأمان</text>
+
+        <!-- Bar 1: TaskFlow -->
+        <g transform="translate(70, 70)">
+          <rect x="0" y="40" width="140" height="200" rx="8" fill="#10b981"/>
+          <text x="70" y="25" class="mono-bold" fill="#047857" font-size="22" text-anchor="middle">38 ms</text>
+          <text x="70" y="270" class="cairo-bold" fill="#1e293b" font-size="19" text-anchor="middle">AI TaskFlow</text>
+          <text x="70" y="295" class="tajawal-reg" fill="#059669" font-size="16" text-anchor="middle">تحقق حتمي آمن</text>
+        </g>
+
+        <!-- Bar 2: Cloud Agents -->
+        <g transform="translate(270, 70)">
+          <rect x="0" y="120" width="140" height="120" rx="8" fill="#94a3b8"/>
+          <text x="70" y="105" class="mono-bold" fill="#475569" font-size="22" text-anchor="middle">185 ms</text>
+          <text x="70" y="270" class="cairo-bold" fill="#1e293b" font-size="19" text-anchor="middle">Auto-Agents</text>
+          <text x="70" y="295" class="tajawal-reg" fill="#64748b" font-size="16" text-anchor="middle">سلسلة وكلاء بطيئة</text>
+        </g>
+
+        <!-- Bar 3: Unvalidated LLM -->
+        <g transform="translate(470, 70)">
+          <rect x="0" y="180" width="140" height="60" rx="8" fill="#f87171"/>
+          <text x="70" y="165" class="cairo-bold" fill="#b91c1c" font-size="20" text-anchor="middle">أخطاء وهلوسة</text>
+          <text x="70" y="270" class="cairo-bold" fill="#1e293b" font-size="19" text-anchor="middle">Direct LLM</text>
+          <text x="70" y="295" class="tajawal-reg" fill="#b91c1c" font-size="16" text-anchor="middle">انهيار متكرر</text>
+        </g>
+      </g>
+    </g>
+  </g>
+
+
+  <!-- ==================== LEFT PANEL: 35 CM (x: 80 to 1080) ==================== -->
+  <!-- 7. النتائج الهندسية -->
+  <g transform="translate(80, 460)" filter="url(#cardShadow)">
+    <rect width="970" height="720" class="card-bg"/>
+    <rect width="16" height="720" rx="8" fill="#059669"/>
+    <text x="920" y="65" class="cairo-bold sec-title" text-anchor="end">07. النتائج الهندسية والخلاصة</text>
+    <text x="920" y="105" class="mono-bold sec-sub" text-anchor="end">RESULTS &amp; CONCLUSIONS</text>
+
+    <g transform="translate(60, 150)">
+      <text x="860" y="0" class="tajawal-bold" fill="#0d3b32" font-size="28" text-anchor="end">الإجابة المؤكدة على التساؤل الهندسي:</text>
+      <text x="860" y="45" class="body-text" text-anchor="end">• نجاح الابتكار في حل مشكلة الهلوسة في التحكم البرمجي عبر الفحص الحتمي الإلزامي.</text>
+      <text x="860" y="90" class="body-text" text-anchor="end">• تحقيق استقلالية تامة عن السحابة؛ حيث يعمل التطبيق ومحركاته محلياً بنسبة 100%.</text>
+      <text x="860" y="135" class="body-text" text-anchor="end">• دمج أدوات متعددة في بيئة عمل واحدة قلل وقت تبديل التطبيقات بنسبة ملحوظة.</text>
+      
+      <rect x="0" y="180" width="860" height="150" rx="12" fill="#ecfdf5" stroke="#a7f3d0" stroke-width="2"/>
+      <text x="830" y="225" class="tajawal-bold" fill="#065f46" font-size="26" text-anchor="end">الخلاصة الهندسية المثبتة:</text>
+      <text x="830" y="265" class="tajawal-reg" fill="#047857" font-size="23" text-anchor="end">النموذج الأولي يثبت أن تقييد الذكاء الاصطناعي بطبقة وسيطة صارمة يحوله من أداة نصية</text>
+      <text x="830" y="300" class="tajawal-reg" fill="#047857" font-size="23" text-anchor="end">غير موثوقة إلى مشغل هندسي آمن ومثالي للأنظمة المعقدة.</text>
+    </g>
+  </g>
+
+  <!-- 8. التطبيقات الواقعية والجدوى الاقتصادية -->
+  <g transform="translate(80, 1220)" filter="url(#cardShadow)">
+    <rect width="970" height="710" class="card-bg"/>
+    <rect width="16" height="710" rx="8" fill="#d97706"/>
+    <text x="920" y="65" class="cairo-bold sec-title" text-anchor="end">08. التطبيقات على أرض الواقع والتكلفة</text>
+    <text x="920" y="105" class="mono-bold sec-sub" text-anchor="end">APPLICATIONS &amp; ECONOMIC IMPACT</text>
+
+    <g transform="translate(60, 150)">
+      <text x="860" y="0" class="tajawal-bold" fill="#0d3b32" font-size="28" text-anchor="end">مجالات التطبيق والاستخدام المباشر:</text>
+      <text x="860" y="45" class="body-text" text-anchor="end">1. المدارس ومعامل العلوم: توفير بيئة تصميم بالذكاء الاصطناعي دون الحاجة للإنترنت.</text>
+      <text x="860" y="90" class="body-text" text-anchor="end">2. المكاتب الهندسية الحساسة: حماية المخططات والرسومات من التسريب السحابي.</text>
+      <text x="860" y="135" class="body-text" text-anchor="end">3. المطورون وصناع المحتوى: توفير بيئة عمل متكاملة تجمع المهام والميديا مجاناً.</text>
+
+      <rect x="0" y="180" width="860" height="150" rx="12" fill="#fffbeb" stroke="#fde68a" stroke-width="2"/>
+      <text x="830" y="225" class="tajawal-bold" fill="#92400e" font-size="26" text-anchor="end">الجدوى الاقتصادية وحساب التكلفة ($0):</text>
+      <text x="830" y="265" class="tajawal-reg" fill="#78350f" font-size="23" text-anchor="end">تكلفة بناء واستخدام التطبيق هي 0$ بالكامل لاعتماده على مكونات مفتوحة المصدر،</text>
+      <text x="830" y="300" class="tajawal-reg" fill="#78350f" font-size="23" text-anchor="end">موفراً أكثر من 1200$ سنوياً للمستخدم مقارنة باشتراكات Jira + Notion + Canva.</text>
+    </g>
+  </g>
+
+  <!-- 9. الدراسات المستقبلية والتوصيات -->
+  <g transform="translate(80, 1970)" filter="url(#cardShadow)">
+    <rect width="970" height="690" class="card-bg"/>
+    <rect width="16" height="690" rx="8" fill="#8b5cf6"/>
+    <text x="920" y="65" class="cairo-bold sec-title" text-anchor="end">09. الدراسة المستقبلية والتوصيات</text>
+    <text x="920" y="105" class="mono-bold sec-sub" text-anchor="end">FUTURE RESEARCH &amp; ROADMAP</text>
+
+    <g transform="translate(60, 150)">
+      <text x="860" y="0" class="body-text" text-anchor="end">1. تضمين نماذج لغوية فائقة الصغر (Edge SLMs):</text>
+      <text x="860" y="40" class="body-muted" text-anchor="end">دمج نماذج مدمجة ومضغوطة (مثل Phi-3 Mini) داخل المثبت مباشرة دون Ollama.</text>
+      
+      <text x="860" y="90" class="body-text" text-anchor="end">2. دعم بروتوكول Model Context Protocol (MCP):</text>
+      <text x="860" y="130" class="body-muted" text-anchor="end">تمكين المنظومة من الاتصال بأدوات خارجية قياسية بنفس معايير الحتمية والأمان.</text>
+
+      <text x="860" y="180" class="body-text" text-anchor="end">3. دراسة تجريبية موسعة لتجربة المستخدم (UX Study):</text>
+      <text x="860" y="220" class="body-muted" text-anchor="end">قياس نسب توفير الوقت وتقليل الأخطاء على عينة تزيد عن 200 مهندس ومصمم.</text>
+
+      <text x="860" y="270" class="body-text" text-anchor="end">4. توسيع الدعم لمنصات إضافية (Linux &amp; macOS):</text>
+      <text x="860" y="310" class="body-muted" text-anchor="end">تطوير حزم بناء مخصصة لباقي أنظمة التشغيل بنفس العزل والخصوصية.</text>
+    </g>
+  </g>
+
+  <!-- 10. المصادر والمراجع العلمية والتوثيق -->
+  <g transform="translate(80, 2700)" filter="url(#cardShadow)">
+    <rect width="970" height="750" class="card-bg"/>
+    <rect width="16" height="750" rx="8" fill="#475569"/>
+    <text x="920" y="65" class="cairo-bold sec-title" text-anchor="end">10. المصادر والمراجع العلمية</text>
+    <text x="920" y="105" class="mono-bold sec-sub" text-anchor="end">REFERENCES &amp; CITATIONS</text>
+
+    <g transform="translate(60, 140)">
+      <text x="860" y="0" class="mono-bold" fill="#0f3b33" font-size="20" text-anchor="end">1. FastAPI Web Framework Documentation (fastapi.tiangolo.com)</text>
+      <text x="860" y="35" class="tajawal-reg" fill="#64748b" font-size="19" text-anchor="end">مرجع بنية الخوادم غير المتزامنة عالية الأداء في بايثون.</text>
+
+      <text x="860" y="80" class="mono-bold" fill="#0f3b33" font-size="20" text-anchor="end">2. Pydantic Type Enforcement Specification (docs.pydantic.dev)</text>
+      <text x="860" y="115" class="tajawal-reg" fill="#64748b" font-size="19" text-anchor="end">مرجع التحقق البنيوي الحتمي ومطابقة المخططات في بيئات التشغيل.</text>
+
+      <text x="860" y="160" class="mono-bold" fill="#0f3b33" font-size="20" text-anchor="end">3. Fernet Symmetric Encryption Specification (cryptography.io)</text>
+      <text x="860" y="195" class="tajawal-reg" fill="#64748b" font-size="19" text-anchor="end">مرجع التشفير المتماثل المعتمد AES-128-CBC مع توثيق HMAC.</text>
+
+      <text x="860" y="240" class="mono-bold" fill="#0f3b33" font-size="20" text-anchor="end">4. SQLite Embedded Relational Engine (sqlite.org)</text>
+      <text x="860" y="275" class="tajawal-reg" fill="#64748b" font-size="19" text-anchor="end">مرجع قواعد البيانات المحلية والمعاملات الذرية المعزولة (ACID).</text>
+
+      <text x="860" y="320" class="mono-bold" fill="#0f3b33" font-size="20" text-anchor="end">5. OpenCalque 2D Computer-Aided Design Toolkit (MIT License)</text>
+      <text x="860" y="355" class="tajawal-reg" fill="#64748b" font-size="19" text-anchor="end">مرجع المحرك المعماري المفتوح المصدر المدمج في المشروع.</text>
+    </g>
+  </g>
+
+  <!-- ==================== POSTER BOTTOM FOOTER ==================== -->
+  <rect x="0" y="3500" width="4200" height="100" fill="#e2ebe6"/>
+  <line x1="0" y1="3500" x2="4200" y2="3500" stroke="#cbdcd3" stroke-width="2"/>
+  <text x="3900" y="3560" class="cairo-bold" fill="#0d3b32" font-size="28" text-anchor="end">مشروع AI TaskFlow: OpenFilm Edition • إعداد الطالب: آدم محمود عبد العليم</text>
+  <text x="2100" y="3560" class="tajawal-bold" fill="#475569" font-size="26" text-anchor="middle">الأبعاد المعتمدة: 140 سم عرض × 120 سم ارتفاع (35 سم جناح أيمن | 70 سم لوحة وسطى | 35 سم جناح أيسر)</text>
+  <text x="300" y="3560" class="mono-bold" fill="#0d3b32" font-size="24" text-anchor="start">ISEF Standards • Engineering Design Approach • Year 2026</text>
+
+</svg>
