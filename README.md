@@ -1,5 +1,9 @@
 # AI TASKFLOW EDITION
 
+[![Architecture diagram of adam-mahmoud12/ai-workflow](https://gitdiagram.com/adam-mahmoud12/ai-workflow/diagram.png)](https://gitdiagram.com/adam-mahmoud12/ai-workflow?utm_source=readme&utm_medium=picture)
+
+[![Architecture diagram](https://gitdiagram.com/diagram-badge.svg)](https://gitdiagram.com/adam-mahmoud12/ai-workflow?utm_source=readme&utm_medium=badge)
+
 Created by **ADAM MAHMOUD ABDELALIM**.
 
 AI TaskFlow combines task and project management with configurable AI providers, visual planning, design tools, and local editing engines. The interface language can be selected in **Settings → Interface language**.
