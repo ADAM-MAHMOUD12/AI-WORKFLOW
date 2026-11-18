@@ -1,18 +1,17 @@
 # AI TASKFLOW EDITION
 
-[![Architecture diagram of adam-mahmoud12/ai-workflow](https://gitdiagram.com/adam-mahmoud12/ai-workflow/diagram.png)](https://gitdiagram.com/adam-mahmoud12/ai-workflow?utm_source=readme&utm_medium=picture)
-
-[![Architecture diagram](https://gitdiagram.com/diagram-badge.svg)](https://gitdiagram.com/adam-mahmoud12/ai-workflow?utm_source=readme&utm_medium=badge)
-
-[![Architecture diagram of adam-mahmoud12/ai-workflow](https://gitdiagram.com/adam-mahmoud12/ai-workflow/diagram.png)](https://gitdiagram.com/adam-mahmoud12/ai-workflow?utm_source=readme&utm_medium=picture)
-
-[![Architecture diagram](https://gitdiagram.com/diagram-badge.svg)](https://gitdiagram.com/adam-mahmoud12/ai-workflow?utm_source=readme&utm_medium=badge)
-
 Created by **ADAM MAHMOUD ABDELALIM**.
 
 AI TaskFlow combines task and project management with configurable AI providers, visual planning, design tools, and local editing engines. The interface language can be selected in **Settings → Interface language**.
 
-![AI TaskFlow sign-in screen](docs/screenshots/sign-in.png)
+| AI TaskFlow dashboard | Shared skill libraries |
+|---|---|
+| ![AI TaskFlow dashboard](docs/screenshots/dashboard.png) | ![Shared TaskFlow and skills.sh libraries](docs/screenshots/skills-library.png) |
+
+Reusable instructions are shared between the web app and TF CODE through the
+[AI-TASKFLO-SKILLS library](https://github.com/ADAM-MAHMOUD12/AI-TASKFLO-SKILLS).
+Browse the catalog in either app, add skills to your account, and use them in AI
+chat with the provider selected for that account.
 
 ## دليل الاستخدام بالعربية
 
@@ -27,7 +26,7 @@ AI TaskFlow combines task and project management with configurable AI providers,
 - **المهام والمشروعات:** أنشئ المهام واربطها بالمشروعات، وحدّث الحالة والصعوبة، وتابع الملخص ونسبة الإنجاز من الصفحة الرئيسية.
 - **مزوّدو الذكاء الاصطناعي:** أضف مزوّدًا متوافقًا مع OpenAI أو Ollama، اختبر الاتصال، ثم اختره للمحادثة والأدوات.
 - **محادثة AI ومنظّم AI:** استخدم سياق مساحة العمل والمستندات لتوليد خطط أو جداول أو إجابات بحث. راجع النتائج قبل اعتماد التغييرات.
-- **مخطط التدفق والمهارات:** أنشئ مخططات العمل باستخدام صيغة W2M/2 الصارمة، واحفظ تعليمات قابلة لإعادة الاستخدام ليستدعيها المساعد لاحقًا.
+- **مخطط التدفق والمهارات:** أنشئ مخططات العمل بصيغة W2M/2، واستعرض مكتبة TaskFlow والمهارات المجتمعية. أضف المهارات إلى حسابك لتستخدمها في محادثات AI مع المزوّد المختار، أو ثبّتها في مساحة عمل TF CODE.
 - **استوديو التصميم:** أنشئ أو عدّل شعارات SVG من خلال برنامج W2M/2 مضبوط الإحداثيات والطبقات، وابحث عن صور مرخّصة. يمكن تثبيت Florence-2 ONNX (حتى 500 MB) لتحليل الصور المرجعية وصور المكتبة والتحقق محليًا من لقطة النتيجة؛ قد يُرسل وصف التحليل النصي للمزوّد المختار لتوليد البرنامج، ولا تُرسل الصور نفسها إليه من هذا المسار. تعرض تنزيلات Florence-2 وWhisper وأصوات Piper حجم النقل الفعلي والحجم الإجمالي والمتبقي.
 - **المخططات المعمارية:** أنشئ مخطط W2M/2، ثم عدّله في OpenCalque ثنائي الأبعاد أو حوّله إلى مشروع في محرر AI TaskFlow 3D.
 - **استوديو الموشن جرافيك:** أنشئ مشروع OpenFilm، وعدّل صفحات المشاهد والـTimeline داخل المحرر. تستخدم طبقة W2M/2 لغة نصية محدّدة القواعد، وتتحقق من بنية المشاهد ومددها ومراجع الـTimeline قبل الحفظ؛ ويمكنها إعادة طلب إصلاح المصدر عند فشل الترجمة. يستخرج التطبيق ثلاث لقطات من الفيديو محليًا ويحللها Florence-2؛ لا يُرفع الفيديو، وإذا لم يدعم المزوّد الصور تُرسل الأوصاف النصية المحلية بدلًا منها. يبقى الفويس أوفر داخل المشروع، ويحلل FFmpeg الصوت محليًا ويرسل توقيتات المقاطع الهادئة فقط.
@@ -81,7 +80,7 @@ To run a source checkout from Windows Command Prompt (CMD), launch `start-all.ba
 - **Tasks and Projects:** create tasks, assign projects and difficulty, track completion, and review the overview.
 - **AI Providers:** add an OpenAI-compatible provider or Ollama, test it, and select it for chat and tools.
 - **AI Chat and Planner:** use workspace and document context to generate plans, tables, or sourced research. Review changes before applying them.
-- **Flowchart and Skills:** create visual workflows through the strict W2M/2 flowchart format, and save reusable instructions for later AI requests.
+- **Flowchart and Skills:** create visual workflows through the strict W2M/2 format, browse the shared TaskFlow and community skills libraries, and use saved skills in AI chat with the account's selected provider or install them into a TF CODE workspace.
 - **Design Studio:** create or edit SVG logos through a coordinate- and layer-aware W2M/2 program, and search licensed image sources. Florence-2 ONNX (up to 500 MB) can analyze reference/library images and verify the rendered result locally; text-only analysis may be sent to the selected provider to generate the program, not the images themselves. Florence-2, Whisper, and Piper downloads show the actual transferred, total, and remaining bytes.
 - **Architectural Plan:** generate a W2M/2 plan, edit it in the OpenCalque 2D editor, or convert it into a scene in AI TaskFlow 3D.
 - **Telegram delivery:** exportable results can be sent to a configured, linked bot; artifacts are not sent when the bot is unavailable.

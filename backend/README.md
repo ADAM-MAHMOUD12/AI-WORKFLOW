@@ -67,6 +67,8 @@ AI provider keys are encrypted at rest; provider-list responses do not expose th
 
 The public `AI-TASKFLO-SKILLS` catalog is shared by the TaskFlow web app and TF CODE. Adding one of these skills from either interface saves it to the signed-in account's `skills` app-data record; TF CODE also installs it under `.agents/skills/` in the open workspace. Account skills added in the web app can be copied into an IDE workspace from the same library panel. AI Chat includes saved skill instructions in requests to the account's selected provider.
 
+![Shared skills flow between AI TaskFlow and TF CODE](https://raw.githubusercontent.com/ADAM-MAHMOUD12/AI-TASKFLO-SKILLS/main/docs/shared-library.svg)
+
 The separate skills.sh directory supplies current popular and searchable community skills. The authenticated backend proxies its public search API and fetches a selected skill only from the public GitHub repository named by the result. Repository owners, skill IDs, tree paths, file size, and SKILL.md front matter are validated before the content is returned. Users choose each skill before importing it.
 
 ## Telegram bot integration

@@ -45,7 +45,7 @@ if not defined TASKFLOW_PYTHON set "TASKFLOW_PYTHON=%~dp0backend\.venv\Scripts\p
 if not exist "%TASKFLOW_PYTHON%" goto :python_missing
 "%TASKFLOW_PYTHON%" -c "import sys;sys.exit(0 if sys.version_info >= (3,10) else 1)" >nul 2>nul
 if errorlevel 1 goto :python_missing
-"%TASKFLOW_PYTHON%" -c "import cryptography, dotenv, fastapi, uvicorn, piper, faster_whisper, huggingface_hub, numpy, onnxruntime, PIL, transformers" >nul 2>nul
+"%TASKFLOW_PYTHON%" -c "import cryptography, dotenv, fastapi, uvicorn, piper, faster_whisper, huggingface_hub, numpy, onnxruntime, PIL, transformers, tqdm" >nul 2>nul
 if errorlevel 1 (
   set "INSTALL_DEPS="
   set /p "INSTALL_DEPS=Required Python libraries are missing. Download and install them now? [Y/N]: "
@@ -53,7 +53,7 @@ if errorlevel 1 (
   echo Installing backend and speech libraries through CMD...
   "%TASKFLOW_PYTHON%" -m pip install -r "backend\requirements.txt"
   if errorlevel 1 goto :python_error
-  "%TASKFLOW_PYTHON%" -c "import cryptography, dotenv, fastapi, uvicorn, piper, faster_whisper, huggingface_hub, numpy, onnxruntime, PIL, transformers" >nul 2>nul
+  "%TASKFLOW_PYTHON%" -c "import cryptography, dotenv, fastapi, uvicorn, piper, faster_whisper, huggingface_hub, numpy, onnxruntime, PIL, transformers, tqdm" >nul 2>nul
   if errorlevel 1 goto :python_error
 )
 "%TASKFLOW_PYTHON%" -X utf8 "scripts\initialize-backend.py"
@@ -322,7 +322,7 @@ start "AI TaskFlow - Backend" /B /D "%~dp0backend" "%TASKFLOW_PYTHON%" -X utf8 -
 echo Waiting for the backend to become ready...
 set "BACKEND_READY="
 for /L %%I in (1,1,30) do (
-  "%TASKFLOW_PYTHON%" -c "import json,urllib.request; status=json.load(urllib.request.urlopen('http://127.0.0.1:%TASKFLOW_API_PORT%/api/auth/status',timeout=2)); assert 'account_count' in status" >nul 2>nul
+  "%TASKFLOW_PYTHON%" -c "import json,urllib.request; base='http://127.0.0.1:%TASKFLOW_API_PORT%'; status=json.load(urllib.request.urlopen(base+'/api/auth/status',timeout=2)); spec=json.load(urllib.request.urlopen(base+'/openapi.json',timeout=2)); assert 'account_count' in status and '/api/skills/library/search' in spec.get('paths',{})" >nul 2>nul
   if not errorlevel 1 set "BACKEND_READY=1"
   if defined BACKEND_READY goto :backend_ready
   timeout /t 1 /nobreak >nul
