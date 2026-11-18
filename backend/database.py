@@ -113,15 +113,45 @@ def initialize_database() -> None:
                     password_hash TEXT NOT NULL,
                     role TEXT NOT NULL CHECK (role IN ('admin', 'user')),
                     status TEXT NOT NULL CHECK (status IN ('approved', 'pending', 'rejected')),
+                    is_blocked SMALLINT NOT NULL DEFAULT 0 CHECK (is_blocked IN (0, 1)),
+                    block_note TEXT NOT NULL DEFAULT '',
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            db.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_blocked SMALLINT NOT NULL DEFAULT 0")
+            db.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS block_note TEXT NOT NULL DEFAULT ''")
+            db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS auth_sessions (
+                    token_hash TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    expires_at TIMESTAMPTZ NOT NULL,
                     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
                 """
             )
             db.execute(
                 """
-                CREATE TABLE IF NOT EXISTS auth_sessions (
-                    token_hash TEXT PRIMARY KEY,
-                    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                CREATE TABLE IF NOT EXISTS github_accounts (
+                    user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                    github_user_id TEXT NOT NULL UNIQUE,
+                    github_login TEXT NOT NULL,
+                    encrypted_access_token TEXT NOT NULL,
+                    scopes TEXT NOT NULL DEFAULT '',
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS github_oauth_flows (
+                    flow_token_hash TEXT PRIMARY KEY,
+                    mode TEXT NOT NULL CHECK (mode IN ('login', 'link')),
+                    user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+                    encrypted_device_code TEXT NOT NULL,
+                    interval_seconds INTEGER NOT NULL,
+                    last_polled_at TIMESTAMPTZ,
                     expires_at TIMESTAMPTZ NOT NULL,
                     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
@@ -161,6 +191,7 @@ def initialize_database() -> None:
                 """
             )
             db.execute("CREATE INDEX IF NOT EXISTS auth_sessions_user_id ON auth_sessions (user_id)")
+            db.execute("CREATE INDEX IF NOT EXISTS github_oauth_flows_expires_at ON github_oauth_flows (expires_at)")
             db.execute(
                 "INSERT INTO auth_settings (key, value) VALUES "
                 "('multi_user_enabled', '0'), ('approval_required', '0'), ('local_only', '1'), "
@@ -235,15 +266,48 @@ def initialize_database() -> None:
                 password_hash TEXT NOT NULL,
                 role TEXT NOT NULL CHECK (role IN ('admin', 'user')),
                 status TEXT NOT NULL CHECK (status IN ('approved', 'pending', 'rejected')),
+                is_blocked INTEGER NOT NULL DEFAULT 0 CHECK (is_blocked IN (0, 1)),
+                block_note TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        user_columns = {row["name"] for row in db.execute("PRAGMA table_info(users)").fetchall()}
+        if "is_blocked" not in user_columns:
+            db.execute("ALTER TABLE users ADD COLUMN is_blocked INTEGER NOT NULL DEFAULT 0")
+        if "block_note" not in user_columns:
+            db.execute("ALTER TABLE users ADD COLUMN block_note TEXT NOT NULL DEFAULT ''")
+        db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS auth_sessions (
+                token_hash TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                expires_at TEXT NOT NULL,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
             """
         )
         db.execute(
             """
-            CREATE TABLE IF NOT EXISTS auth_sessions (
-                token_hash TEXT PRIMARY KEY,
-                user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            CREATE TABLE IF NOT EXISTS github_accounts (
+                user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                github_user_id TEXT NOT NULL UNIQUE,
+                github_login TEXT NOT NULL,
+                encrypted_access_token TEXT NOT NULL,
+                scopes TEXT NOT NULL DEFAULT '',
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS github_oauth_flows (
+                flow_token_hash TEXT PRIMARY KEY,
+                mode TEXT NOT NULL CHECK (mode IN ('login', 'link')),
+                user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+                encrypted_device_code TEXT NOT NULL,
+                interval_seconds INTEGER NOT NULL,
+                last_polled_at TEXT,
                 expires_at TEXT NOT NULL,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
@@ -283,6 +347,7 @@ def initialize_database() -> None:
             """
         )
         db.execute("CREATE INDEX IF NOT EXISTS auth_sessions_user_id ON auth_sessions (user_id)")
+        db.execute("CREATE INDEX IF NOT EXISTS github_oauth_flows_expires_at ON github_oauth_flows (expires_at)")
         db.execute(
             "INSERT OR IGNORE INTO auth_settings (key, value) VALUES "
             "('multi_user_enabled', '0'), ('approval_required', '0'), ('local_only', '1'), "

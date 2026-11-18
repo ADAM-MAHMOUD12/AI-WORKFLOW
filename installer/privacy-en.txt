@@ -2,7 +2,9 @@ OPENFILM-AI TASKFLOW EDITION — Privacy Notice and Agreement
 
 This application runs on your computer. Tasks, projects, account records, provider settings, and generated local project files are stored on the host device. Account passwords are stored as salted, slow password hashes. AI provider API keys are encrypted in the local database.
 
-When you use an AI provider, the prompt and any content you choose to attach are sent to that provider. Provider privacy, retention, and charges are governed by that provider. Video references in Motion Graphics are sampled into still frames in the browser; those frames may be sent to the selected AI provider. Uploaded voiceover audio remains in the local project; local silence analysis sends only timing results to the AI provider.
+When you use an AI provider, the prompt and any content you choose to attach are sent to that provider. Provider privacy, retention, and charges are governed by that provider. Motion Graphics extracts three still frames from a reference video in the browser and analyzes them locally with Florence-2; the full video is never uploaded. The still frames may be sent if the selected provider accepts images; otherwise only local text descriptions are sent. Uploaded voiceover audio remains in the local project; local silence analysis sends only timing results to the AI provider.
+
+The Design Studio can download a pinned Florence-2 ONNX vision model (up to 500 MB) on request. Reference images, library-image previews, and rendered SVG screenshots are analyzed on the host device and are not sent as image files to the configured provider through this design workflow. Captions, OCR text, detected regions, and the W2M prompt may be sent to the provider to generate or repair a design. The model download requires internet access; local vision inference works offline after download.
 
 Network sharing is off by default. If enabled by the host administrator, other devices on the same local network may reach the application. Use individual accounts and administrator approval. Do not expose this development application directly to the public internet.
 

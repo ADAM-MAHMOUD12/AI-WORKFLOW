@@ -9,6 +9,7 @@ if not env_file.exists():
     env_file.write_text(
         "TASKFLOW_ENV=development\n"
         f"TASKFLOW_ENCRYPTION_KEY={fernet_key}\n"
-        "TASKFLOW_DATABASE=./data/taskflow.db\n",
+        "TASKFLOW_DATABASE=./data/taskflow.db\n"
+        "TASKFLOW_GITHUB_CLIENT_ID=\n",
         encoding="utf-8",
     )

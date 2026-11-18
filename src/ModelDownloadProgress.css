@@ -1,0 +1,88 @@
+.model-download-progress {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle, #343744);
+  border-radius: 11px;
+  color: var(--text, #eeedf5);
+  background: color-mix(in srgb, var(--panel, #1d202a) 86%, transparent);
+  font-size: 12px;
+}
+
+.model-download-progress-heading,
+.model-download-progress-detail {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.model-download-progress-heading strong {
+  flex: 1;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-download-progress-heading > span {
+  color: var(--emerald, #91e2d3);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.model-download-progress-track {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted, #777) 22%, transparent);
+}
+
+.model-download-progress-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--purple, #b8a8ff), var(--emerald, #91e2d3));
+  transition: width 180ms ease-out;
+}
+
+.model-download-progress-detail {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  color: var(--muted-light, #d0cfdb);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+}
+
+.model-download-progress.state-downloading .model-download-progress-heading > svg {
+  color: var(--purple, #b8a8ff);
+}
+
+.model-download-progress.state-complete .model-download-progress-heading > svg {
+  color: var(--emerald, #91e2d3);
+}
+
+.model-download-progress.state-error {
+  border-color: color-mix(in srgb, var(--rose, #eba6c6) 40%, transparent);
+}
+
+.model-download-progress.state-error .model-download-progress-heading > svg,
+.model-download-error {
+  color: var(--rose, #eba6c6);
+}
+
+.model-download-spinner {
+  animation: model-download-spin 1s linear infinite;
+}
+
+@keyframes model-download-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .model-download-spinner {
+    animation-duration: 2s;
+  }
+}

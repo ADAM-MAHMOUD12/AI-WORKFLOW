@@ -1,0 +1,217 @@
+.glass-control {
+  position: relative;
+  z-index: 40;
+  color: #f3f1f8;
+  font-family: inherit;
+}
+
+.glass-control-trigger,
+.glass-control-close,
+.glass-control-reset,
+.glass-control-upload,
+.glass-control-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 42px;
+  padding: 8px 12px;
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 12px;
+  color: inherit;
+  background: rgb(26 27 33 / 68%);
+  cursor: pointer;
+  font: inherit;
+  backdrop-filter: blur(var(--glass-blur, 20px)) saturate(var(--glass-saturation, 125%));
+}
+
+.glass-control-trigger:hover,
+.glass-control-close:hover,
+.glass-control-reset:hover,
+.glass-control-upload:hover,
+.glass-control-remove:hover {
+  background: rgb(61 55 76 / 82%);
+  border-color: rgb(205 190 255 / 44%);
+}
+
+.glass-control-trigger:focus-visible,
+.glass-control :is(button, input):focus-visible {
+  outline: 2px solid #d2c4ff;
+  outline-offset: 3px;
+}
+
+.glass-control-auth {
+  position: absolute;
+  inset-block-start: max(18px, env(safe-area-inset-top));
+  inset-inline-end: max(18px, env(safe-area-inset-right));
+}
+
+.glass-control-toolbar {
+  flex: 0 0 auto;
+}
+
+.glass-control-toolbar .glass-control-trigger {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  color: #d3c8ff;
+}
+
+.glass-control-panel {
+  position: absolute;
+  inset-block-start: calc(100% + 10px);
+  inset-inline-end: 0;
+  display: grid;
+  gap: 16px;
+  width: min(340px, calc(100vw - 32px));
+  max-height: min(82vh, 620px);
+  padding: 18px;
+  overflow: auto;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 18px;
+  background:
+    linear-gradient(145deg, rgb(29 29 35 / 90%), rgb(19 20 25 / 88%)),
+    color-mix(in srgb, var(--glass-tint, #9b87ef) 14%, transparent);
+  box-shadow: 0 22px 64px rgb(0 0 0 / 55%), inset 0 1px rgb(255 255 255 / 8%);
+  backdrop-filter: blur(var(--glass-blur, 20px)) saturate(var(--glass-saturation, 125%));
+}
+
+.glass-control-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.glass-control-panel h2 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  color: #f7f5fc;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.glass-control-panel h2 svg {
+  color: #cbbcff;
+}
+
+.glass-control-close {
+  width: 38px;
+  min-height: 38px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+}
+
+.glass-control-range {
+  display: grid;
+  gap: 10px;
+  color: #e0dfe7;
+  font-size: 13px;
+}
+
+.glass-control-range > span,
+.glass-control-color,
+.glass-control-wallpaper > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.glass-control-range output {
+  color: #c7c1d6;
+  font-variant-numeric: tabular-nums;
+}
+
+.glass-control-range input[type="range"] {
+  width: 100%;
+  min-height: 30px;
+  margin: 0;
+  accent-color: #b8a8ff;
+  cursor: pointer;
+}
+
+.glass-control-color,
+.glass-control-wallpaper {
+  color: #e0dfe7;
+  font-size: 13px;
+}
+
+.glass-control-color input[type="color"] {
+  width: 46px;
+  height: 38px;
+  padding: 3px;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 9px;
+  background: rgb(255 255 255 / 8%);
+  cursor: pointer;
+}
+
+.glass-control-wallpaper {
+  display: grid;
+  gap: 10px;
+}
+
+.glass-control-upload,
+.glass-control-remove {
+  width: 100%;
+  min-height: 42px;
+  color: #f2effa;
+  background: rgb(255 255 255 / 8%);
+  text-align: center;
+}
+
+.glass-control-upload input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+.glass-control-remove {
+  color: #ffc8d0;
+  border-color: rgb(230 139 155 / 24%);
+}
+
+.glass-control-reset {
+  width: 100%;
+  min-height: 44px;
+  border-color: transparent;
+  background: rgb(255 255 255 / 10%);
+  font-weight: 700;
+}
+
+.glass-control-error {
+  margin: 0;
+  color: #ffc3cc;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 520px) {
+  .glass-control-panel {
+    position: fixed;
+    inset-block-start: 68px;
+    inset-inline: 12px;
+    width: auto;
+    max-height: calc(100dvh - 84px);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass-control-trigger,
+  .glass-control-close,
+  .glass-control-reset,
+  .glass-control-upload,
+  .glass-control-remove,
+  .glass-control-panel {
+  background: #22232a;
+  backdrop-filter: none;
+  }
+}

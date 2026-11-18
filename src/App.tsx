@@ -3,11 +3,11 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import {
   BrainCircuit,
   Check,
-  ChevronDown,
-  CircleHelp,
   Brush,
   Building2,
   Clapperboard,
+  Code2,
+  Film,
   Download,
   Eye,
   FileText,
@@ -15,12 +15,10 @@ import {
   GitBranch,
   LayoutDashboard,
   LoaderCircle,
-  Menu,
   MessageCircle,
   Mic,
   Plus,
   Rotate3D,
-  Search,
   Settings2,
   Sparkles,
   Target,
@@ -44,6 +42,8 @@ import SkillsCenter from "./SkillsCenter";
 import SVGLogoStudio from "./SVGLogoStudio";
 import ArchitecturalPlanStudio from "./ArchitecturalPlanStudio";
 import MotionGraphicsStudio from "./MotionGraphicsStudio";
+import ProgrammingStudio from "./ProgrammingStudio";
+import ContentEditingStudio from "./ContentEditingStudio";
 import DocumentAttachments, { documentsAsContext, type TextDocument } from "./DocumentAttachments";
 import AuthGate from "./AuthGate";
 import { useAuth } from "./authContext";
@@ -51,8 +51,14 @@ import { API_BASE, apiFetch, serviceUrl } from "./api";
 import { saveLanguage, translate, useLanguage } from "./localization";
 import ServerAccessSettings from "./ServerAccessSettings";
 import TelegramBotSettings from "./TelegramBotSettings";
+import GitHubAccountSettings from "./GitHubAccountSettings";
+import AccountSecuritySettings from "./AccountSecuritySettings";
+import TaskFlowDashboardLayout, { type DashboardNavItem, type Page } from "./TaskFlowDashboardLayout";
 import "./App.css";
 import "./WorkspaceRedesign.css";
+import "./TaskFlowDashboardLayout.css";
+import "./TaskFlowVisualTheme.css";
+import "./TaskFlowGlassSurface.css";
 
 type Project = {
   id: number;
@@ -69,22 +75,6 @@ type Task = {
   done: boolean;
   difficulty: "سهل" | "متوسط" | "صعب";
 };
-
-type Page =
-  | "Overview"
-  | "Projects"
-  | "Flowchart"
-  | "AI Chat"
-  | "Speaking Trainer"
-  | "Skills"
-  | "Design"
-  | "Architectural Plan"
-  | "Motion Graphics"
-  | "AI TaskFlow 3D"
-  | "AI Planner"
-  | "Markdown"
-  | "AI Providers"
-  | "Settings";
 
 type SavedData = {
   tasks?: Task[];
@@ -115,7 +105,7 @@ const DEMO_PROJECT_NAMES = new Set(["AI TaskFlow", "Personal Growth", "Website L
 const DEMO_MARKDOWN = "# AI TaskFlow\n\n## الهدف\nبناء مدير مهام ذكي يساعدني على تنظيم مشاريعي.\n\n## المهام\n- [x] تحديد فكرة المشروع\n- [ ] تصميم الواجهة\n- [ ] بناء نظام الذكاء الاصطناعي\n";
 type MarkdownView = "split" | "editor" | "preview";
 
-const navItems: { label: Page; icon: typeof LayoutDashboard }[] = [
+const navItems: DashboardNavItem[] = [
   { label: "Overview", icon: LayoutDashboard },
   { label: "Projects", icon: FolderKanban },
   { label: "Flowchart", icon: Workflow },
@@ -124,6 +114,8 @@ const navItems: { label: Page; icon: typeof LayoutDashboard }[] = [
   { label: "Design", icon: Brush },
   { label: "Architectural Plan", icon: Building2 },
   { label: "Motion Graphics", icon: Clapperboard },
+  { label: "Content Editing", icon: Film },
+  { label: "Programming", icon: Code2 },
   { label: "Skills", icon: Sparkles },
   { label: "AI Planner", icon: Table2 },
   { label: "Markdown", icon: FileText },
@@ -247,8 +239,38 @@ function WorkspaceApp() {
   const workspaceSwitcher = useRef<HTMLDivElement>(null);
 
   const [page, setPage] = useState<Page>("Overview");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("taskflow-sidebar-collapsed-v1") === "true";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    const theiaOrigin = new URL(serviceUrl(3102)).origin;
+    const handleTheiaMessage = (event: MessageEvent<unknown>) => {
+      if (event.origin !== theiaOrigin || !event.data || typeof event.data !== "object" ||
+        !("type" in event.data) || typeof event.data.type !== "string") return;
+      if (event.data.type === "taskflow:toggle-platform-sidebar") {
+        setSidebarCollapsed((current) => !current);
+        window.dispatchEvent(new Event("taskflow:mobile-sidebar-toggle"));
+      } else if (event.data.type === "taskflow:return-to-platform") {
+        setPage("Overview");
+      }
+    };
+    window.addEventListener("message", handleTheiaMessage);
+    return () => window.removeEventListener("message", handleTheiaMessage);
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem("taskflow-sidebar-collapsed-v1", String(sidebarCollapsed));
+    } catch {
+      // The sidebar toggle remains available even when browser storage is disabled.
+    }
+  }, [sidebarCollapsed]);
   const visibleNavItems = navItems.filter(({ label }) => {
     if (label === "Motion Graphics") return status?.engine_openfilm_enabled !== false;
+    if (label === "Content Editing") return status?.engine_openfilm_enabled !== false;
     if (label === "AI TaskFlow 3D") return status?.engine_3d_enabled !== false;
     if (label === "Architectural Plan") return status?.engine_2d_enabled !== false || status?.engine_3d_enabled !== false;
     return true;
@@ -270,7 +292,6 @@ function WorkspaceApp() {
   const [showTaskInput, setShowTaskInput] = useState(false);
   const [showProjectInput, setShowProjectInput] = useState(false);
   const [search, setSearch] = useState("");
-  const [mobileMenu, setMobileMenu] = useState(false);
 
   useEffect(() => {
     if (!workspaceDataReady) return;
@@ -426,9 +447,18 @@ function WorkspaceApp() {
       animated: true,
     }));
     const snapshot = { nodes, edges };
-    void writeAppData("flowchart", snapshot);
-    window.dispatchEvent(new CustomEvent("taskflow:apply-flowchart", { detail: snapshot }));
+    try {
+      localStorage.setItem("taskflow-flowchart-v1", JSON.stringify(snapshot));
+    } catch (reason) {
+      console.error("تعذر حفظ مخطط التدفق مؤقتًا في المتصفح:", reason);
+    }
+    void writeAppData("flowchart", snapshot).catch((reason: unknown) => {
+      console.error("تعذر حفظ مخطط التدفق في قاعدة البيانات:", reason);
+    });
     setPage("Flowchart");
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent("taskflow:apply-flowchart", { detail: snapshot }));
+    }, 0);
   }
 
   function updateTaskDifficulty(id: number, difficulty: Task["difficulty"]) {
@@ -503,9 +533,8 @@ function WorkspaceApp() {
           results.push(describeAIAppAction(action));
           break;
         case "planner.replace": {
-          void writeAppData("pending_planner", action.table);
+          await writeAppData("pending_planner", action.table);
           setPage("AI Planner");
-          window.dispatchEvent(new CustomEvent("taskflow:ai-planner-table", { detail: action.table }));
           results.push(describeAIAppAction(action));
           break;
         }
@@ -938,6 +967,14 @@ function WorkspaceApp() {
       return <MotionGraphicsStudio />;
     }
 
+    if (page === "Programming") {
+      return <ProgrammingStudio onExit={() => setPage("Overview")} />;
+    }
+
+    if (page === "Content Editing") {
+      return <ContentEditingStudio />;
+    }
+
     if (page === "AI TaskFlow 3D") {
       return (
         <section className="taskflow3d-page">
@@ -1046,7 +1083,9 @@ function WorkspaceApp() {
             <p>{t("تُحفظ المهام والمشروعات والمستندات والإعدادات في قاعدة البيانات المحلية. مفاتيح مزوّدي AI محفوظة مشفّرة في قاعدة بيانات الباكيند.")}</p>
             <button className="secondary-button" onClick={() => setPage("AI Providers")}><BrainCircuit size={16} /> {t("إدارة مزوّدي AI")}</button>
           </div>
+          {user && <GitHubAccountSettings />}
           {user && <TelegramBotSettings />}
+          {user && <AccountSecuritySettings />}
           {user?.role === "admin" && <ServerAccessSettings />}
         </>
       );
@@ -1205,211 +1244,63 @@ function WorkspaceApp() {
   }
 
   return (
-    <div className={`app-shell${preferences.compactMode ? " compact-mode" : ""}`} dir={language === "ar" ? "rtl" : "ltr"}>
-      <aside className={`sidebar ${mobileMenu ? "mobile-open" : ""}`}>
-        <div className="brand">
-          <div className="brand-mark">
-            <BrainCircuit size={25} />
-          </div>
-          <div>
-            <strong>OPENFILM-AI TASKFLOW EDITION</strong>
-            <span>AI WORKSPACE</span>
-          </div>
-        </div>
-
-        <div className="workspace-switcher" ref={workspaceSwitcher}>
-          <button
-            type="button"
-            className="workspace-picker"
-            aria-haspopup="menu"
-            aria-expanded={showWorkspaceMenu}
-            onClick={() => setShowWorkspaceMenu((current) => !current)}
-          >
-            <div className="workspace-avatar">{activeWorkspace?.name.trim().charAt(0) || "A"}</div>
-            <div className="workspace-copy">
-              <strong>{activeWorkspace?.name ?? "مساحة عملي"}</strong>
-              <span>{activeWorkspace?.data.projects?.length ?? 0} {t("مشروع")} · {activeWorkspace?.data.tasks?.length ?? 0} {t("مهمة")}</span>
+    <TaskFlowDashboardLayout
+      page={page}
+      sidebarCollapsed={sidebarCollapsed}
+      onToggleSidebar={() => setSidebarCollapsed((current) => !current)}
+      navItems={visibleNavItems}
+      language={language}
+      compactMode={preferences.compactMode}
+      t={t}
+      activeWorkspace={activeWorkspace}
+      workspaces={workspaceStore.workspaces}
+      workspaceSwitcher={workspaceSwitcher}
+      showWorkspaceMenu={showWorkspaceMenu}
+      onToggleWorkspaceMenu={() => setShowWorkspaceMenu((current) => !current)}
+      onCloseWorkspaceMenu={() => setShowWorkspaceMenu(false)}
+      onSwitchWorkspace={switchWorkspace}
+      creatingWorkspace={creatingWorkspace}
+      onStartWorkspaceCreation={() => setCreatingWorkspace(true)}
+      onCancelWorkspaceCreation={() => { setCreatingWorkspace(false); setWorkspaceNameInput(""); }}
+      workspaceNameInput={workspaceNameInput}
+      onWorkspaceNameChange={setWorkspaceNameInput}
+      onCreateWorkspace={createWorkspace}
+      profile={profile}
+      search={search}
+      onSearchChange={setSearch}
+      onNavigate={setPage}
+      onOpenHelp={() => setShowHelp(true)}
+      onOpenProfile={() => { setProfileNotice(""); setPage("Settings"); }}
+      onOpen3DLauncher={() => setShow3DLauncher(true)}
+      canOpen3D={status?.engine_3d_enabled !== false}
+      overlays={
+        <>
+          {showHelp && <HelpCenter onClose={() => setShowHelp(false)} />}
+          {show3DLauncher && (
+            <div className="taskflow3d-modal-backdrop" role="presentation" onMouseDown={() => setShow3DLauncher(false)}>
+              <div className="taskflow3d-modal" role="dialog" aria-modal="true" aria-labelledby="taskflow3d-title" onMouseDown={(event) => event.stopPropagation()}>
+                <div className="taskflow3d-modal-icon"><Building2 size={26} /></div>
+                <h2 id="taskflow3d-title">{t("فتح AI TaskFlow 3D")}</h2>
+                <p>{t("اختر طريقة عرض المحرك")}</p>
+                <div className="taskflow3d-modal-actions">
+                  <button type="button" onClick={() => { setShow3DLauncher(false); setPage("AI TaskFlow 3D"); }}>
+                    <Eye size={20} />
+                    <span><strong>{t("عرض داخل الصفحة")}</strong><small>{t("ملء مساحة AI TaskFlow")}</small></span>
+                  </button>
+                  <button type="button" onClick={() => { window.open(serviceUrl(3002), "_blank", "noopener,noreferrer"); setShow3DLauncher(false); }}>
+                    <Rotate3D size={20} />
+                    <span><strong>{t("فتح في صفحة جديدة")}</strong><small>{t("تشغيل المحرك في تبويب منفصل")}</small></span>
+                  </button>
+                </div>
+                <button className="taskflow3d-modal-close" type="button" onClick={() => setShow3DLauncher(false)}>{t("إلغاء")}</button>
+              </div>
             </div>
-            <ChevronDown size={16} />
-          </button>
-          {showWorkspaceMenu && <div className="workspace-menu" role="menu" aria-label="مساحات العمل">
-            <span className="workspace-menu-heading">مساحات العمل</span>
-            {workspaceStore.workspaces.map((workspace) => (
-              <button
-                key={workspace.id}
-                type="button"
-                role="menuitem"
-                className={`workspace-menu-item${workspace.id === workspaceStore.activeWorkspaceId ? " active" : ""}`}
-                onClick={() => switchWorkspace(workspace)}
-              >
-                <span className="workspace-menu-avatar">{workspace.name.trim().charAt(0) || "A"}</span>
-                <span className="workspace-menu-copy">
-                  <strong>{workspace.name}</strong>
-                  <small>{workspace.data.projects?.length ?? 0} {t("مشروع")} · {workspace.data.tasks?.length ?? 0} {t("مهمة")}</small>
-                </span>
-                {workspace.id === workspaceStore.activeWorkspaceId && <Check size={15} />}
-              </button>
-            ))}
-            {creatingWorkspace ? (
-              <form className="workspace-create-form" onSubmit={(event) => { event.preventDefault(); createWorkspace(); }}>
-                <input autoFocus value={workspaceNameInput} onChange={(event) => setWorkspaceNameInput(event.target.value)} placeholder={t("اسم مساحة العمل")} aria-label={t("اسم مساحة العمل")} maxLength={40} />
-                <button type="submit" disabled={!workspaceNameInput.trim()} aria-label="إنشاء مساحة العمل"><Check size={15} /></button>
-                <button type="button" onClick={() => { setCreatingWorkspace(false); setWorkspaceNameInput(""); }} aria-label={t("إلغاء")}><span>×</span></button>
-              </form>
-            ) : (
-              <button type="button" className="workspace-create-button" role="menuitem" onClick={() => setCreatingWorkspace(true)}>
-                <Plus size={16} /> {t("مساحة عمل جديدة")}
-              </button>
-            )}
-          </div>}
-        </div>
-
-        <span className="nav-caption">{t("مساحة العمل")}</span>
-
-        <nav>
-          {visibleNavItems.map(({ label, icon: Icon }) => (
-            <button
-              key={label}
-              className={`nav-item ${page === label ? "active" : ""}`}
-              onClick={() => {
-                setPage(label);
-                setMobileMenu(false);
-              }}
-            >
-              <Icon size={19} />
-              <span>
-                {translate(({
-                  Overview: "نظرة عامة", Projects: "المشاريع", Flowchart: "مخطط التدفق",
-                  "AI Chat": "محادثة AI", "Speaking Trainer": "مدرّب المحادثة", Design: "التصميم", "Architectural Plan": "المخطط المعماري",
-                  "Motion Graphics": "موشن جرافيك", "AI TaskFlow 3D": "AI TaskFlow 3D",
-                  Skills: "المهارات", "AI Planner": "منظّم ذكي", Markdown: "مستند Markdown",
-                  "AI Providers": "مزوّدو الذكاء الاصطناعي", Settings: "الإعدادات",
-                } as Record<Page, string>)[label], language)}
-              </span>
-              {label === "AI Providers" && <span className="nav-dot" />}
-            </button>
-          ))}
-        </nav>
-
-        {status?.engine_3d_enabled !== false && <button className="taskflow3d-launcher" type="button" onClick={() => setShow3DLauncher(true)}>
-          <Building2 size={19} />
-          <span>
-            <strong>AI TaskFlow 3D</strong>
-            <small>{t("افتح محرر المخططات ثلاثية الأبعاد")}</small>
-          </span>
-        </button>}
-
-        <div className="sidebar-bottom">
-          <div className="upgrade-card">
-            <div className="upgrade-icon">
-              <Sparkles size={19} />
-            </div>
-            <strong>{t("مساحة أذكى، إنجاز أكبر")}</strong>
-            <p>{t("اجمع مهامك ومشاريعك في مكان واحد.")}</p>
-            <button onClick={() => setPage("AI Providers")}>
-              {t("استكشف مركز AI")} <span>←</span>
-            </button>
-          </div>
-
-          <button className="profile-row" onClick={() => { setProfileNotice(""); setPage("Settings"); }} title="تعديل الملف الشخصي">
-            <div className="profile-avatar">{profile.name.trim().charAt(0) || "A"}</div>
-            <div className="profile-copy">
-              <strong>{profile.name || t("مساحتي الشخصية")}</strong>
-              <span>{profile.email || t("المستخدم المحلي")}</span>
-            </div>
-            <Settings2 size={18} />
-          </button>
-        </div>
-      </aside>
-
-      <main className="main-area">
-        <header className="topbar">
-          <button
-            className="mobile-menu-button icon-button"
-            onClick={() => setMobileMenu(!mobileMenu)}
-            aria-label={t("القائمة")}
-          >
-            <Menu size={20} />
-          </button>
-
-          <div className="breadcrumbs">
-            <span>{t("مساحة العمل")}</span>
-            <span>/</span>
-            <strong>
-              {translate((
-                {
-                  Overview: "نظرة عامة",
-                  Projects: "المشاريع",
-                  Flowchart: "مخطط التدفق",
-                  "AI Chat": "محادثة AI",
-                  "Speaking Trainer": "مدرّب المحادثة",
-                  Design: "التصميم",
-                  "Architectural Plan": "المخطط المعماري",
-                  "Motion Graphics": "موشن جرافيك",
-                  "AI TaskFlow 3D": "AI TaskFlow 3D",
-                  Skills: "المهارات",
-                  "AI Planner": "منظّم ذكي",
-                  Markdown: "Markdown",
-                  "AI Providers": "مزوّدو AI",
-                  Settings: "الإعدادات",
-                } as Record<Page, string>
-              )[page], language)}
-            </strong>
-          </div>
-
-          <div className="topbar-actions">
-            <label className="search-box">
-              <Search size={17} />
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder={t("ابحث عن مهمة...")}
-              />
-            </label>
-            <button
-              className="icon-button notification-button"
-              title={t("المساعدة")}
-              onClick={() => setShowHelp(true)}
-              aria-label={t("فتح مركز المساعدة")}
-            >
-              <CircleHelp size={19} />
-            </button>
-            <div className="top-avatar">{profile.name.trim().charAt(0) || "A"}</div>
-          </div>
-        </header>
-
-        <div className="page-content">
-          {renderContent()}
-          <footer className="app-footer">
-            <span>
-              <span className="status-dot" /> {t("الحفظ المحلي التلقائي مفعّل")}
-            </span>
-            <span>AI TaskFlow · {t("الإصدار التجريبي")}</span>
-          </footer>
-        </div>
-      </main>
-      {showHelp && <HelpCenter onClose={() => setShowHelp(false)} />}
-      {show3DLauncher && (
-        <div className="taskflow3d-modal-backdrop" role="presentation" onMouseDown={() => setShow3DLauncher(false)}>
-          <div className="taskflow3d-modal" role="dialog" aria-modal="true" aria-labelledby="taskflow3d-title" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="taskflow3d-modal-icon"><Building2 size={26} /></div>
-            <h2 id="taskflow3d-title">{t("فتح AI TaskFlow 3D")}</h2>
-            <p>{t("اختر طريقة عرض المحرك")}</p>
-            <div className="taskflow3d-modal-actions">
-              <button type="button" onClick={() => { setShow3DLauncher(false); setPage("AI TaskFlow 3D"); }}>
-                <Eye size={20} />
-                <span><strong>{t("عرض داخل الصفحة")}</strong><small>{t("ملء مساحة AI TaskFlow")}</small></span>
-              </button>
-              <button type="button" onClick={() => { window.open(serviceUrl(3002), "_blank", "noopener,noreferrer"); setShow3DLauncher(false); }}>
-                <Rotate3D size={20} />
-                <span><strong>{t("فتح في صفحة جديدة")}</strong><small>{t("تشغيل المحرك في تبويب منفصل")}</small></span>
-              </button>
-            </div>
-            <button className="taskflow3d-modal-close" type="button" onClick={() => setShow3DLauncher(false)}>{t("إلغاء")}</button>
-          </div>
-        </div>
-      )}
-    </div>
+          )}
+        </>
+      }
+    >
+      {renderContent()}
+    </TaskFlowDashboardLayout>
   );
 }
 

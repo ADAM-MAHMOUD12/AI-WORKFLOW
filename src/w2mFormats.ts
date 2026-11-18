@@ -18,9 +18,15 @@ function fail(section: string, line: number, message: string): never {
 }
 
 function sourceLines(source: string, section: string): string[] {
-  const cleaned = source.trim()
-    .replace(/^```(?:w2m(?:\/2)?(?:\s+[a-z]+)?|text)?[ \t]*\r?\n/i, "")
+  let cleaned = source.replace(/^\uFEFF/, "").trim()
     .replace(/\r?\n```[ \t]*$/, "");
+  const header = new RegExp(`(?:^|\\r?\\n)(W2M/2 ${section})[ \\t]*(?=\\r?\\n|$)`, "i").exec(cleaned);
+  if (header?.index !== undefined) {
+    const headerOffset = header[0].lastIndexOf(header[1]);
+    cleaned = cleaned.slice(header.index + headerOffset);
+  } else {
+    cleaned = cleaned.replace(/^```[^\r\n]*\r?\n/, "");
+  }
   const lines = cleaned.split(/\r?\n/);
   if (lines[0]?.trim() !== `W2M/2 ${section}`) {
     fail(section, 1, `يجب أن يبدأ الملف بـ W2M/2 ${section}.`);
@@ -235,6 +241,15 @@ export function parseW2MDesign(source: string): W2MDesign {
     }
     return result;
   };
+  const readPositionAndPairs = (tokens: string[], start: number, line: number) => {
+    const x = tokens[start];
+    const y = tokens[start + 1];
+    if (x !== undefined && y !== undefined && x.trim() !== "" && y.trim() !== "" &&
+      Number.isFinite(Number(x)) && Number.isFinite(Number(y))) {
+      return { X: Number(x), Y: Number(y), ...readPairs(tokens, start + 2, line) };
+    }
+    return readPairs(tokens, start, line);
+  };
   for (let index = 1; index < lines.length - 2; index += 1) {
     const raw = lines[index].trim();
     if (!raw) continue;
@@ -247,11 +262,11 @@ export function parseW2MDesign(source: string): W2MDesign {
     const command = tokens[0];
     if (command === "ADD" && tokens.length >= 3) {
       const action: W2MDesignAction = { type: "add", shape: tokens[1].toLowerCase(), id: tokens[2] };
-      Object.assign(action, readPairs(tokens, 3, line));
+      Object.assign(action, readPositionAndPairs(tokens, 3, line));
       actions.push(action);
     } else if (command === "IMAGE" && tokens.length >= 2) {
       const action: W2MDesignAction = { type: "add-image", assetId: tokens[1] };
-      Object.assign(action, readPairs(tokens, 2, line));
+      Object.assign(action, readPositionAndPairs(tokens, 2, line));
       actions.push(action);
     } else if (command === "UPDATE" && tokens.length >= 2) {
       const action: W2MDesignAction = { type: "update", target: tokens[1] };

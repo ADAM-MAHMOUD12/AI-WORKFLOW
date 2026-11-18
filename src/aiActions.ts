@@ -27,7 +27,6 @@ export type AIAppAction =
   | { type: "skill.remove"; id: string }
   | { type: "provider.set_model"; providerId: string; model: string }
   | { type: "provider.set_default"; providerId: string }
-  | { type: "terminal.run"; command: "build" | "lint" }
   | { type: "settings.update"; compactMode?: boolean; defaultChatMode?: "auto" | "chat" }
   | { type: "workspace.create"; name: string }
   | { type: "workspace.switch"; id: string };
@@ -130,8 +129,6 @@ export function validateAIAppAction(value: unknown): AIAppAction | null {
       return shortText(value.providerId, 100) && shortText(value.model, 160) ? { type: value.type, providerId: shortText(value.providerId, 100), model: shortText(value.model, 160) } : null;
     case "provider.set_default":
       return shortText(value.providerId, 100) ? { type: value.type, providerId: shortText(value.providerId, 100) } : null;
-    case "terminal.run":
-      return value.command === "build" || value.command === "lint" ? { type: value.type, command: value.command } : null;
     case "settings.update":
       return typeof value.compactMode === "boolean" || value.defaultChatMode === "auto" || value.defaultChatMode === "chat" ? {
         type: value.type,
@@ -166,7 +163,6 @@ export function describeAIAppAction(action: AIAppAction) {
     case "skill.remove": return `حذف مهارة #${action.id}`;
     case "provider.set_model": return `تغيير موديل المزوّد إلى ${action.model}`;
     case "provider.set_default": return "تغيير المزوّد الافتراضي";
-    case "terminal.run": return `تشغيل الفحص المحدد: npm run ${action.command}`;
     case "settings.update": return "تعديل إعدادات مساحة العمل";
     case "workspace.create": return `إنشاء مساحة: ${action.name}`;
     case "workspace.switch": return `تغيير مساحة العمل إلى #${action.id}`;

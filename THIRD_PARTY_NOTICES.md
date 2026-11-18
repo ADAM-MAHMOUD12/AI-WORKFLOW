@@ -34,3 +34,45 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## Florence-2-base-ft ONNX
+
+Source: https://huggingface.co/onnx-community/Florence-2-base-ft
+Model revision: `e88a44eaf3791a35eae0c5a47b3dbcd36e67eb6f`
+License: MIT (model card).
+
+The Design Studio downloads the selected quantized ONNX graphs and processor files on user request. They are stored under `backend/data/w2m-models` and are not bundled in the source tree or installer.
+
+## shadcn Dashboard Landing Template
+
+Source: https://github.com/shadcnstore/shadcn-dashboard-landing-template
+
+Pinned source revision: `866423741fa4b62d5e9427603cb2174aedf00f80`
+
+License file: [`License.md`](https://github.com/shadcnstore/shadcn-dashboard-landing-template/blob/866423741fa4b62d5e9427603cb2174aedf00f80/License.md)
+
+License: MIT.
+
+`src/TaskFlowDashboardLayout.tsx` adapts the reusable `vite-version/src/components/layouts/base-layout.tsx` and `vite-version/src/components/app-sidebar.tsx` structure. `src/TaskFlowDashboardLayout.css` adapts the design tokens from `vite-version/src/index.css`. The integrated shell is wired to TaskFlow's existing workspace, navigation, localization, and feature surfaces; template demo pages, analytics, and assets are not included.
+
+MIT License
+
+Copyright (c) 2025 ShadcnStore
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

@@ -1,4 +1,4 @@
-type TaskflowPorts = { api?: number; frontend?: number; engine3d?: number; engine2d?: number };
+type TaskflowPorts = { api?: number; frontend?: number; engine3d?: number; engine2d?: number; theia?: number };
 
 declare global {
   interface Window {
@@ -10,6 +10,7 @@ const runtimePorts = window.TASKFLOW_PORTS;
 const servicePorts: Record<number, number | undefined> = {
   3002: runtimePorts?.engine3d,
   5174: runtimePorts?.engine2d,
+  3102: runtimePorts?.theia,
 };
 
 export const API_BASE = `${window.location.protocol}//${window.location.hostname}:${runtimePorts?.api ?? 8000}`;

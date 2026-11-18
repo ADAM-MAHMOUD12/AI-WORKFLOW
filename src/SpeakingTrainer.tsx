@@ -16,6 +16,9 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { API_BASE, apiFetch } from "./api";
 import "./SpeakingTrainer.css";
+import ModelDownloadProgress from "./ModelDownloadProgress";
+import { runTrackedDownload, type ModelDownloadStatus } from "./modelDownloads";
+import { translate, useLanguage } from "./localization";
 
 type Provider = {
   id: string;
@@ -79,8 +82,8 @@ const tutorMoods: Array<{ id: TutorMood; label: string; description: string; ins
 ];
 
 const PIPER_VOICES: Record<VoiceLanguage, { label: string; size: string; sample: string }> = {
-  ar: { label: "العربية الأردنية · كريم", size: "≈ 60 MB", sample: "أهلًا بك في تدريب المحادثة. خذ نفسًا وابدأ عندما تكون مستعدًا." },
-  en: { label: "الإنجليزية البريطانية · Alan", size: "≈ 60 MB", sample: "Welcome to your speaking practice. Take a breath and begin when you are ready." },
+  ar: { label: "العربية الأردنية · كريم", size: "≈ 63.2 MB", sample: "أهلًا بك في تدريب المحادثة. خذ نفسًا وابدأ عندما تكون مستعدًا." },
+  en: { label: "الإنجليزية البريطانية · Alan", size: "≈ 63.2 MB", sample: "Welcome to your speaking practice. Take a breath and begin when you are ready." },
 };
 
 const practiceParts: Array<{ title: string; description: string; duration: string; questions: PracticeQuestion[] }> = [
@@ -144,6 +147,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export default function SpeakingTrainer({ onOpenProviders }: { onOpenProviders: () => void }) {
+  const language = useLanguage();
   const [providers, setProviders] = useState<Provider[]>([]);
   const [providerId, setProviderId] = useState("");
   const [partIndex, setPartIndex] = useState(0);
@@ -167,6 +171,7 @@ export default function SpeakingTrainer({ onOpenProviders }: { onOpenProviders: 
   const [speaking, setSpeaking] = useState(false);
   const [transcriptionEngine, setTranscriptionEngine] = useState<SpeechEngineStatus | null>(null);
   const [installingTranscription, setInstallingTranscription] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<Record<string, ModelDownloadStatus>>({});
   const [speechLanguage, setSpeechLanguage] = useState<VoiceLanguage>("en");
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recordingStreamRef = useRef<MediaStream | null>(null);
@@ -246,7 +251,11 @@ export default function SpeakingTrainer({ onOpenProviders }: { onOpenProviders: 
     setInstallingTranscription(true);
     setError("");
     try {
-      await request<{ installed: boolean }>("/api/speech/transcription/download", { method: "POST" });
+      await runTrackedDownload(
+        "whisper",
+        () => request<{ installed: boolean }>("/api/speech/transcription/download", { method: "POST" }),
+        (progress) => setDownloadProgress((current) => ({ ...current, whisper: progress })),
+      );
       await loadVoiceStatus();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "تعذّر تنزيل نموذج تحويل الكلام المحلي.");
@@ -260,7 +269,11 @@ export default function SpeakingTrainer({ onOpenProviders }: { onOpenProviders: 
     setInstallingVoice(language);
     setError("");
     try {
-      await request<{ installed: boolean }>(`/api/speech/voices/${language}/download`, { method: "POST" });
+      await runTrackedDownload(
+        `piper-${language}`,
+        () => request<{ installed: boolean }>(`/api/speech/voices/${language}/download`, { method: "POST" }),
+        (progress) => setDownloadProgress((current) => ({ ...current, [progress.id]: progress })),
+      );
       await loadVoiceStatus();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "تعذّر تنزيل الصوت المحلي.");
@@ -436,7 +449,7 @@ export default function SpeakingTrainer({ onOpenProviders }: { onOpenProviders: 
     }
     if (transcribing || installingTranscription || requestingMicrophone) return;
     if (!transcriptionEngine?.installed) {
-      setError("حمّل نموذج Whisper المحلي من بطاقة المدرّب أولًا؛ حجمه نحو 145 ميغابايت.");
+      setError("حمّل نموذج Whisper المحلي من بطاقة المدرّب أولًا؛ حجمه نحو 148 ميغابايت.");
       return;
     }
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
@@ -649,18 +662,38 @@ export default function SpeakingTrainer({ onOpenProviders }: { onOpenProviders: 
         </label>
       </header>
 
-      <div className="speaking-notice"><CircleAlert size={17} /><span>التسجيل والتفريغ يعملان محليًا بعد تنزيل نموذج Whisper (نحو 145 ميغابايت)، بلا خدمة تعرّف صوتي عبر الإنترنت. الصوت التوليدي أيضًا محلي عبر Piper. التقييم وتوليد الأسئلة وتشكيل الملاحظات قبل الاستماع تُرسل إلى المزوّد المختار وقد تترتب عليها رسوم حسب خطتك.</span></div>
+      <div className="speaking-notice"><CircleAlert size={17} /><span>التسجيل والتفريغ يعملان محليًا بعد تنزيل نموذج Whisper (نحو 148 ميغابايت)، بلا خدمة تعرّف صوتي عبر الإنترنت. الصوت التوليدي أيضًا محلي عبر Piper. التقييم وتوليد الأسئلة وتشكيل الملاحظات قبل الاستماع تُرسل إلى المزوّد المختار وقد تترتب عليها رسوم حسب خطتك.</span></div>
 
       <section className="speaking-avatar-panel" aria-label="شخصية المدرّب">
         <div className={`speaking-avatar mood-${mood} activity-${avatarActivity}`} role="img" aria-label={`${selectedMood.label}، ${avatarActivity === "speaking" ? "يتحدث" : avatarActivity === "listening" ? "يستمع" : avatarActivity === "transcribing" ? "يفرّغ التسجيل" : avatarActivity === "thinking" ? "يفكر" : "مستعد"}`}>
           <span className="speaking-avatar-halo" />
           <svg className="speaking-avatar-face" viewBox="0 0 180 190" aria-hidden="true">
-            <path className="speaking-avatar-hair" d="M37 87C31 42 57 17 91 17c37 0 61 25 57 70l-12-15c-10-12-17-25-20-35-16 19-40 29-72 30l-7 20z" />
+            <defs>
+              <linearGradient id="speaking-hair-gradient" x1="0" x2="1" y1="0" y2="1">
+                <stop offset="0" stopColor="#526b79" />
+                <stop offset="1" stopColor="#243846" />
+              </linearGradient>
+              <linearGradient id="speaking-fringe-gradient" x1="0" x2="1" y1="0" y2="1">
+                <stop offset="0" stopColor="#526b79" />
+                <stop offset="1" stopColor="#344c5a" />
+              </linearGradient>
+              <linearGradient id="speaking-skin-gradient" x1="0" x2="1" y1="0" y2="1">
+                <stop offset="0" stopColor="#edbd98" />
+                <stop offset="1" stopColor="#c98668" />
+              </linearGradient>
+            </defs>
+            <ellipse cx="90" cy="177" rx="57" ry="9" fill="#050a11" opacity=".22" />
+            <path className="speaking-avatar-hair" d="M35 88C28 46 49 15 88 13c40-2 64 25 58 70l-11-13c-10-12-17-25-20-35-15 17-39 27-72 29l-8 24z" />
             <path className="speaking-avatar-neck" d="M72 137h36v24H72z" />
-            <path className="speaking-avatar-body" d="M32 188c4-26 24-42 58-42s54 16 58 42z" />
+            <path className="speaking-avatar-body" d="M27 188c5-29 28-45 63-45s58 16 63 45z" />
+            <path className="speaking-avatar-shirt" d="m66 146 24 22 24-22 13 8 15 34H38l15-34z" />
+            <path className="speaking-avatar-lapel" d="m66 145 24 23-16 10-17-27zm48 0-24 23 16 10 17-27z" />
+            <path className="speaking-avatar-tie" d="m87 166 3 3 3-3 5 7-5 15h-6l-5-15z" />
+            <circle className="speaking-avatar-pin" cx="118" cy="173" r="3" />
             <path className="speaking-avatar-ear" d="M43 83c-12-5-17 2-14 16 2 9 8 14 16 12m92-28c12-5 17 2 14 16-2 9-8 14-16 12" />
             <path className="speaking-avatar-skin" d="M48 61c0-25 16-40 42-40s42 15 42 40v40c0 25-18 42-42 42s-42-17-42-42z" />
-            <path className="speaking-avatar-fringe" d="M44 69C42 37 60 17 91 17c20 0 34 9 43 25-17-7-26-16-29-24-14 17-34 25-59 27z" />
+            <path className="speaking-avatar-fringe" d="M43 68C39 37 57 14 88 13c21-1 37 8 46 25-17-5-28-14-31-23-14 16-34 24-59 26z" />
+            <path d="M54 47c15-4 28-12 37-23" fill="none" stroke="#d4e5e9" strokeWidth="2" strokeLinecap="round" opacity=".3" />
             <path className="speaking-avatar-brow brow-left" d="M62 77c7-5 17-5 23 0" />
             <path className="speaking-avatar-brow brow-right" d="M96 77c7-5 17-5 23 0" />
             <ellipse className="speaking-avatar-eye-white eye-left" cx="74" cy="88" rx="8" ry="6" />
@@ -669,6 +702,7 @@ export default function SpeakingTrainer({ onOpenProviders }: { onOpenProviders: 
             <ellipse className="speaking-avatar-eye eye-right" cx="107" cy="88" rx="4.3" ry="5.2" />
             <circle className="speaking-avatar-eye-glint" cx="76.5" cy="86" r="1.5" />
             <circle className="speaking-avatar-eye-glint" cx="108.5" cy="86" r="1.5" />
+            <path d="M63 94c5 3 12 4 19 2m25 0c7 2 14 1 19-2" fill="none" stroke="#bb765f" strokeWidth="1.6" strokeLinecap="round" opacity=".48" />
             <path className="speaking-avatar-lash" d="M65 85l-3-2m49 2 3-2" />
             <path className="speaking-avatar-nose" d="M89 91c-2 11-7 19-3 21 3 2 7 2 10 0" />
             <path className="speaking-avatar-mouth mouth-smile" d="M74 121c9 12 23 12 32 0" />
@@ -698,14 +732,22 @@ export default function SpeakingTrainer({ onOpenProviders }: { onOpenProviders: 
               </div>;
             })}
           </div>
+          {installingVoice && <ModelDownloadProgress
+            progress={downloadProgress[`piper-${installingVoice}`] ?? null}
+            label={translate("تنزيل الصوت المحلي", language)}
+          />}
           <div className="speaking-transcription">
             <span><strong>تحويل الكلام إلى نص</strong><small>{transcriptionEngine?.installed ? "Whisper محلي · جاهز" : "نموذج محلي · تنزيل لمرة واحدة"}</small></span>
             {transcriptionEngine?.installed
               ? <span className="speaking-ready"><CheckCircle2 size={14} /> جاهز</span>
               : <button type="button" disabled={installingTranscription || !transcriptionEngine} onClick={() => void installTranscriptionModel()}>
-                {installingTranscription ? <><LoaderCircle size={14} className="speaking-spinner" /> جارٍ تنزيل النموذج...</> : <><Download size={14} /> تنزيل · نحو 145 MB</>}
+                {installingTranscription ? <><LoaderCircle size={14} className="speaking-spinner" /> جارٍ تنزيل النموذج...</> : <><Download size={14} /> تنزيل · نحو 148 MB</>}
               </button>}
           </div>
+          {installingTranscription && <ModelDownloadProgress
+            progress={downloadProgress.whisper ?? null}
+            label={translate("تنزيل نموذج Whisper المحلي", language)}
+          />}
         </div>
       </section>
 

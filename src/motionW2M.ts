@@ -211,10 +211,40 @@ function validateCompiledProject(project: OpenFilmProject, sceneLines: number[])
   return checked;
 }
 
+function addMissingTimelineStarts(filmHtml: string, scenes: ProjectScene[]): string {
+  const sceneStarts = new Map<string, number>();
+  let nextStart = 0;
+  for (const scene of scenes) {
+    sceneStarts.set(scene.file, nextStart);
+    nextStart += scene.duration;
+  }
+
+  return filmHtml.replace(/<iframe\b[^>]*>/gi, (tag) => {
+    const attributes = tag.slice("<iframe".length, -1);
+    const src = attributes.match(/\bsrc\s*=\s*(["'])(.*?)\1/i)?.[2];
+    if (!src || /\bat\s*=/.test(attributes)) return tag;
+    const file = src.match(/(?:^|\/)(scene-\d{2}\.html)(?:#|$)/i)?.[1];
+    const scene = scenes.find((item) => item.file === file);
+    const start = file ? sceneStarts.get(file) : undefined;
+    const duration = src.match(/#t=0(?:\.0*)?,(\d+(?:\.\d+)?)/i)?.[1];
+    if (!scene || start === undefined || duration === undefined ||
+      Math.abs(Number(duration) - scene.duration) > DURATION_TOLERANCE) return tag;
+    return tag.replace(/\/?>$/, (ending) => ` at="${start.toFixed(3)}"${ending}`);
+  });
+}
+
 function cleanReply(reply: string): string {
-  return reply.trim()
-    .replace(/^```(?:w2m(?:\/2)?|text)?[ \t]*\r?\n/i, "")
+  let cleaned = reply.replace(/^\uFEFF/, "").trim()
+    .replace(/```[ \t]*(W2M\/(?:1|2)(?:[ \t]+PROJECT)?)[ \t]*(?=\r?\n)/gi, "$1")
+    .replace(/^```[^\r\n]*\r?\n/, "")
     .replace(/\r?\n```[ \t]*$/, "");
+  const header = /(?:^|\r?\n)(W2M\/(?:1|2))(?:[ \t]+PROJECT)?[ \t]*(?=\r?\n|$)/i.exec(cleaned);
+  if (header?.index !== undefined && header.index > 0) {
+    cleaned = cleaned.slice(header.index + (cleaned[header.index] === "\n" ? 1 : 0));
+  }
+  return cleaned
+    .replace(/^DO SCENE[ \t]+(scene-\d{2}\.html)[ \t]+BEGIN(?:[ \t]+\d+(?:\.\d+)?s)?[ \t]*$/gim, "DO SCENE $1")
+    .replace(/^W2M\/2[ \t]+PROJECT(?=\r?\n|$)/i, "W2M/2");
 }
 
 export function parseW2MProject(reply: string): OpenFilmProject {
@@ -256,7 +286,11 @@ export function parseW2MProject(reply: string): OpenFilmProject {
     return html;
   };
 
-  const versionLine = expectLine(/^W2M\/(?:1|2)$/i, "W2M100", "بداية الملف يجب أن تكون W2M/2.");
+  const versionLine = expectLine(
+    /^W2M\/(?:1|2)$/i,
+    "W2M100",
+    "يجب أن يبدأ ملف الموشن جرافيك بـ W2M/2 فقط، ثم DO PROJECT في السطر التالي. أزل أي مقدمة أو اسم قسم من سطر الإصدار.",
+  );
   const version = Number(versionLine.split("/")[1]);
   expectLine(/^DO PROJECT$/i, "W2M101", "كتلة DO PROJECT مفقودة.");
   const titleLine = expectLine(
@@ -352,7 +386,7 @@ export function parseW2MProject(reply: string): OpenFilmProject {
     width,
     height,
     duration,
-    film_html: filmHtml,
+    film_html: addMissingTimelineStarts(filmHtml, scenes),
     scenes,
   }, sceneLines);
 

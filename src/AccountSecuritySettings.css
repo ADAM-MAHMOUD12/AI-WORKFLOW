@@ -1,0 +1,63 @@
+.account-security-settings {
+  display: grid;
+  gap: 12px;
+}
+
+.account-security-settings > p {
+  margin: -4px 0 0;
+  color: var(--muted, #8e8ea6);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.account-security-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.account-security-actions button {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.account-security-actions button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.account-security-actions .account-delete-button {
+  padding: 9px 13px;
+  border: 1px solid rgb(244 63 94 / 35%);
+  border-radius: 10px;
+  color: #ffb6c1;
+  background: rgb(244 63 94 / 8%);
+  font: inherit;
+  font-size: 12px;
+}
+
+.account-security-actions .account-delete-button:hover:not(:disabled) {
+  background: rgb(244 63 94 / 14%);
+}
+
+.account-security-settings > small {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  color: #d7a646;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.account-security-settings > small svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.account-security-settings > .account-security-error {
+  margin: 0;
+  color: #ffb6c1;
+}

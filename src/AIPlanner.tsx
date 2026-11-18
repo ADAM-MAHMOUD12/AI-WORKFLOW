@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Download, FileSpreadsheet, Globe2, LoaderCircle, Plus, Search, Sparkles, Table2, Trash2, Workflow } from "lucide-react";
 import type { FlowchartArtifact } from "./AIChat";
 import DocumentAttachments, { documentsAsContext, type TextDocument } from "./DocumentAttachments";
@@ -139,17 +139,22 @@ export default function AIPlanner({
   const [notice, setNotice] = useState("");
   const [aiRawReply, setAiRawReply] = useState("");
   const [replyTab, setReplyTab] = useState<"result" | "program">("result");
+  const initialWorkbookSynced = useRef(false);
 
   useEffect(() => {
-    if (!plannerReady) return;
+    if (!plannerReady || initialWorkbookSynced.current) return;
+    initialWorkbookSynced.current = true;
     const activeId = workbookCollection.workbooks.some((workbook) => workbook.id === workbookCollection.activeWorkbookId)
       ? workbookCollection.activeWorkbookId
       : workbookCollection.workbooks[0]?.id;
     if (!activeId) return;
     const active = workbookCollection.workbooks.find((workbook) => workbook.id === activeId)!;
-    setActiveWorkbookId(activeId);
-    setTable(active);
-  }, [plannerReady]);
+    const timer = window.setTimeout(() => {
+      setActiveWorkbookId(activeId);
+      setTable(active);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [plannerReady, workbookCollection]);
 
   useEffect(() => {
     setWorkbookCollection((current) => ({
@@ -160,7 +165,7 @@ export default function AIPlanner({
         : workbook),
     }));
     document.querySelectorAll<HTMLTextAreaElement>(".planner-table td textarea").forEach(resizeCellElement);
-  }, [table, activeWorkbookId]);
+  }, [table, activeWorkbookId, setWorkbookCollection]);
 
   useEffect(() => {
     let active = true;
@@ -178,30 +183,19 @@ export default function AIPlanner({
   }, []);
 
   useEffect(() => {
-    function applyAIPlannerTable(event: Event) {
-      const table = (event as CustomEvent<PlannerTable>).detail;
-      if (!table || !Array.isArray(table.columns) || !Array.isArray(table.rows)) return;
-      const workbook = createWorkbook(table);
+    if (!pendingPlannerTable || !plannerReady) return;
+    const tableToApply = pendingPlannerTable;
+    const timer = window.setTimeout(() => {
+      const workbook = createWorkbook(tableToApply);
       setWorkbookCollection((current) => ({ activeWorkbookId: workbook.id, workbooks: [workbook, ...current.workbooks] }));
       setActiveWorkbookId(workbook.id);
       setTable(workbook);
       setMode("table");
       setNotice("أنشأ AI ملف جدول جديدًا بعد موافقتك.");
-    }
-    window.addEventListener("taskflow:ai-planner-table", applyAIPlannerTable);
-    return () => window.removeEventListener("taskflow:ai-planner-table", applyAIPlannerTable);
-  }, [setWorkbookCollection]);
-
-  useEffect(() => {
-    if (!pendingPlannerTable) return;
-    const workbook = createWorkbook(pendingPlannerTable);
-    setWorkbookCollection((current) => ({ activeWorkbookId: workbook.id, workbooks: [workbook, ...current.workbooks] }));
-    setActiveWorkbookId(workbook.id);
-    setTable(workbook);
-    setMode("table");
-    setNotice("أنشأ AI ملف جدول جديدًا بعد موافقتك.");
-    setPendingPlannerTable(null);
-  }, [pendingPlannerTable, setPendingPlannerTable, setWorkbookCollection]);
+      setPendingPlannerTable(null);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [pendingPlannerTable, plannerReady, setPendingPlannerTable, setWorkbookCollection]);
 
   function updateCell(rowIndex: number, columnIndex: number, value: string) {
     setTable((current) => ({

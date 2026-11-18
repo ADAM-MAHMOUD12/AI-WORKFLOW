@@ -29,7 +29,7 @@ copyFileSync(resolve(fileAccessSource, "LICENSE"), resolve(fileAccessTarget, "LI
 const editorHtmlPath = resolve(editorTarget, "index.html");
 const editorHtml = readFileSync(editorHtmlPath, "utf8");
 const editorHtmlBranded = editorHtml
-  .replace("<title>SVG-edit</title>", "<title>AI-TENSORFLOW LOGO DESIGN TOOL</title>")
+  .replace("<title>SVG-edit</title>", "<title>AI TaskFlow | SVG Studio</title>")
   .replace('<link href="./svgedit.css" rel="stylesheet" media="all">', '<link href="./svgedit.css" rel="stylesheet" media="all">\n  <link href="./taskflow-theme.css" rel="stylesheet" media="all">');
 if (editorHtmlBranded === editorHtml) {
   throw new Error("SVG-Edit index template changed; review the brand/theme injection points.");
@@ -37,17 +37,30 @@ if (editorHtmlBranded === editorHtml) {
 writeFileSync(editorHtmlPath, editorHtmlBranded);
 
 const themeCss = `
-.svg_editor { background: #12121d; color: #eeedf7; font-family: Tahoma, "Segoe UI", sans-serif; }
-#tools_top, #tools_left, #tools_bottom, #sidepanels, #title_panel, #rulers, #ruler_corner, #main_button { background-color: #12121d; border-color: #252536; color: #eeedf7; }
-#workarea { background-color: #0b0b12; border-color: #252536; }
+.svg_editor {
+ --main-bg-color: #171922;
+ --text-color: #e7e8f0;
+ --border-color: #363a48;
+ --canvas-bg-color: #272a35;
+ --link-color: #b7a5ff;
+ --ruler-color: #303440;
+ --icon-bg-color: #20232d;
+ --icon-bg-color-hover: #34303f;
+ --input-color: #20232d;
+ background: #171922;
+ color: #e7e8f0;
+ font-family: Tahoma, "Segoe UI", sans-serif;
+}
+#tools_top, #tools_left, #tools_bottom, #sidepanels, #title_panel, #rulers, #ruler_corner, #main_button { background-color: #171922; border-color: #363a48; color: #e7e8f0; }
+#workarea { background-color: #1b1e28; border-color: #363a48; }
 #svgcanvas { background: #ffffff; }
-#title_panel > p { color: #d7c5ff; }
+#title_panel > p { color: #b7a5ff; }
 #tools_left, #tools_top, #tools_bottom, #sidepanels { box-shadow: none; }
-se-button { --icon-bg-color: #12121d; --icon-bg-color-hover: #252536; }
-se-button[pressed] { --icon-bg-color: #33254c; }
-se-menu { color: #eeedf7; }
-se-menu-item:hover { background-color: #252536; }
-input, select, textarea { accent-color: #8b5cf6; }
+se-button { --icon-bg-color: #20232d; --icon-bg-color-hover: #34303f; }
+se-button[pressed] { --icon-bg-color: #393346; }
+se-menu { color: #e7e8f0; }
+se-menu-item:hover { background-color: #34303f; }
+input, select, textarea { accent-color: #b8a8ff; }
 `;
 writeFileSync(resolve(editorTarget, "taskflow-theme.css"), themeCss);
 
@@ -57,7 +70,7 @@ const upstreamMenuLabel = 'label=\\"SVG-Edit\\"';
 if (!editorBundle.includes(upstreamMenuLabel)) {
   throw new Error("SVG-Edit main menu label changed; review the local branding patch.");
 }
-writeFileSync(editorBundlePath, editorBundle.replace(upstreamMenuLabel, 'label=\\"AI-TENSORFLOW LOGO DESIGN TOOL\\"'));
+writeFileSync(editorBundlePath, editorBundle.replace(upstreamMenuLabel, 'label=\\"AI TaskFlow | SVG Studio\\"'));
 
 const openSavePath = resolve(editorTarget, "extensions/ext-opensave/ext-opensave.js");
 const openSaveBundle = readFileSync(openSavePath, "utf8");

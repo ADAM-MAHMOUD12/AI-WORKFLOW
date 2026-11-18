@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, Eye, EyeOff, LoaderCircle, Save, Search, Sparkles, WandSparkles, X } from "lucide-react";
+import { ChevronDown, Download, Eye, EyeOff, LoaderCircle, Save, Search, Sparkles, WandSparkles, X } from "lucide-react";
 import DocumentAttachments, { documentsAsContext, type TextDocument } from "./DocumentAttachments";
 import { API_BASE, apiFetch, deliverArtifactToTelegram, sanitizeArtifactFilename } from "./api";
 import "./SVGLogoStudio.css";
+import ModelDownloadProgress from "./ModelDownloadProgress";
+import { runTrackedDownload, type ModelDownloadStatus } from "./modelDownloads";
 import { useLanguage, translate } from "./localization";
 import { parseW2MDesign } from "./w2mFormats";
 
@@ -12,7 +14,7 @@ const EMPTY_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="${CANVAS_WIDTH
 const LOGO_SYSTEM_PROMPT = `You are a professional graphic designer operating the open-source SVG-Edit vector editor. Return one complete W2M/2 DESIGN program only. Grammar:
 W2M/2 DESIGN
 TITLE "short design title"
-ADD rect|circle|ellipse|line|text|path|polygon element-id X number Y number [WIDTH number] [HEIGHT number] [RADIUS number] [X2 number] [Y2 number] [POINTS "x,y ..."] [PATH "SVG path data"] [TEXT "visible text"] [FILL "#RRGGBB"] [STROKE "#RRGGBB"] [STROKE_WIDTH number] [FONT_SIZE number] [FONT "font family"]
+ADD rect|circle|ellipse|line|text|path|polygon element-id X number Y number [WIDTH number] [HEIGHT number] [RADIUS number] [X2 number] [Y2 number] [POINTS "x,y ..."] [PATH "SVG path data"] [TEXT "visible text"] [FILL "#RRGGBB"] [STROKE "#RRGGBB"] [STROKE_WIDTH number] [FONT_SIZE number] [FONT "font family"] [TEXT_ANCHOR start|middle|end]
 IMAGE exact-asset-id X number Y number WIDTH number HEIGHT number
 UPDATE existing-id FILL "#RRGGBB" STROKE "#RRGGBB" STROKE_WIDTH number OPACITY number FONT_SIZE number FONT "font family" TEXT_ANCHOR start|middle|end X number Y number WIDTH number HEIGHT number RADIUS number TEXT "replacement text"
 MOVE existing-id DX number DY number
@@ -26,7 +28,7 @@ ZOOM multiplier
 PAN dx dy
 END DESIGN
 END W2M
-Every command is one line. Quote all text values as JSON strings so punctuation and Arabic are safe. Omit optional properties rather than inventing them. The 1200x760 artboard origin is top-left; rect/image x,y is top-left, circle/ellipse x,y is center, text x,y is baseline. Keep every element fully inside the artboard, use exact shared grid anchors for alignment, balanced margins, deliberate size hierarchy, and non-overlapping text. Use only exact asset IDs from the supplied licensed library. Do not output JSON, Markdown, HTML, SVG source, scripts, external URLs, explanations, or guessed IDs.`;
+Every command is one line. Always write property names, including X and Y (for example: ADD rect box X 20 Y 30 WIDTH 100 HEIGHT 80). For paths, X/Y is the local origin and every PATH coordinate is relative to that origin; keep the path's full bounds within its intended element area. Render every exact name, slogan, and other visible text requested by the user as its own editable text element; never omit requested copy. Use legible font sizes and strong contrast against the background. Quote all text values as JSON strings so punctuation and Arabic are safe. Omit optional properties rather than inventing them. The 1200x760 artboard origin is top-left; rect/image x,y is top-left, circle/ellipse x,y is center, text x,y is baseline. Keep every element fully inside the artboard, use exact shared grid anchors for alignment, balanced margins, deliberate size hierarchy, and non-overlapping text. Use only exact asset IDs from the supplied licensed library. Do not output JSON, Markdown, HTML, SVG source, scripts, external URLs, explanations, or guessed IDs.`;
 const NATIVE_TOOL_PROMPT = `The live SVG-Edit catalog and current editable layer inventory are included in the request. Use only exact existing element IDs when updating, moving, rotating, deleting, selecting, or ordering layers. Use only exact listed tool IDs and image asset IDs. Create descriptive unique IDs, plan a consistent grid before placing objects, and use only editable vector primitives and the supplied image assets.`;
 type Provider = { id: string; name: string; model: string; is_default: boolean };
 type EditorAction = {
@@ -55,12 +57,16 @@ type EditorAction = {
   strokeWidth?: number;
   fontSize?: number;
   fontFamily?: string;
+  textAnchor?: "start" | "middle" | "end";
   name?: string;
   dx?: number;
   dy?: number;
   attributes?: Record<string, string | number>;
 };
 type ImageAsset = { id: string; title: string; thumbnail: string; source: string; license: string; author: string; width: number; height: number; dataUri?: string };
+type LocalVisionStatus = { engine: string; installed: boolean; loaded: boolean; runtime_ready: boolean; size_bytes: number; max_size_bytes: number; offline_after_download: boolean };
+type LocalVisionRegion = { label: string; box: [number, number, number, number] };
+type LocalVisionAnalysis = { engine: string; width: number; height: number; caption: string; objects: LocalVisionRegion[]; text_regions: LocalVisionRegion[]; local_only: boolean };
 type SVGHistoryCommand = {
   type: () => string;
   getText: () => string;
@@ -132,105 +138,268 @@ function estimateContextLimit(model: string) {
   return 32_000;
 }
 
+async function readImageDataUrl(file: File): Promise<string> {
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.src = objectUrl;
+    await image.decode();
+    if (image.naturalWidth > 8192 || image.naturalHeight > 8192) {
+      throw new Error("أبعاد الصورة المرجعية أكبر من الحد المدعوم 8192×8192.");
+    }
+    const scale = Math.min(1, 2048 / image.naturalWidth, 2048 / image.naturalHeight);
+    const normalized = document.createElement("canvas");
+    normalized.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    normalized.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const context = normalized.getContext("2d");
+    if (!context) throw new Error("تعذّر تجهيز الصورة المرجعية للتحليل.");
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, normalized.width, normalized.height);
+    context.drawImage(image, 0, 0, normalized.width, normalized.height);
+    return normalized.toDataURL("image/webp", 0.88);
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+async function analyzeWithLocalVision(image: string, mode: "full" | "caption" = "full"): Promise<LocalVisionAnalysis> {
+  const response = await apiFetch(`${API_BASE}/api/w2m/vision/analyze`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ image, mode }),
+  });
+  const result: unknown = await response.json();
+  if (!response.ok) {
+    const detail = typeof result === "object" && result !== null && "detail" in result &&
+      typeof result.detail === "string" ? result.detail : "تعذّر تحليل الصورة محليًا.";
+    throw new Error(detail);
+  }
+  if (typeof result !== "object" || result === null || !("engine" in result) ||
+    typeof result.engine !== "string" || !("width" in result) || typeof result.width !== "number" ||
+    !("height" in result) || typeof result.height !== "number" || !("caption" in result) ||
+    typeof result.caption !== "string" || !("objects" in result) || !Array.isArray(result.objects) ||
+    !("text_regions" in result) || !Array.isArray(result.text_regions) ||
+    !("local_only" in result) || result.local_only !== true) {
+    throw new Error("استجابة Florence-2 المحلية غير صالحة.");
+  }
+  const regions = (values: unknown[]): LocalVisionRegion[] => values.flatMap((value) => {
+    if (typeof value !== "object" || value === null || !("label" in value) ||
+      typeof value.label !== "string" || !("box" in value) || !Array.isArray(value.box) ||
+      value.box.length !== 4 || !value.box.every((coordinate) => typeof coordinate === "number" && Number.isFinite(coordinate))) return [];
+    const [x1, y1, x2, y2] = value.box;
+    return [{ label: value.label, box: [x1, y1, x2, y2] }];
+  });
+  return {
+    engine: result.engine,
+    width: result.width,
+    height: result.height,
+    caption: result.caption,
+    objects: regions(result.objects),
+    text_regions: regions(result.text_regions),
+    local_only: true,
+  };
+}
+
+async function renderSvgPreview(svg: string): Promise<string> {
+  const objectUrl = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
+  try {
+    const image = new Image();
+    image.src = objectUrl;
+    await image.decode();
+    const preview = document.createElement("canvas");
+    preview.width = CANVAS_WIDTH;
+    preview.height = CANVAS_HEIGHT;
+    const context = preview.getContext("2d");
+    if (!context) throw new Error("تعذّر تجهيز معاينة التصميم للتحقق البصري.");
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, preview.width, preview.height);
+    context.drawImage(image, 0, 0, preview.width, preview.height);
+    return preview.toDataURL("image/webp", 0.82);
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+function findLayoutIssues(canvas: SVGCanvasApi): string[] {
+  const issues: string[] = [];
+  const root = canvas.getSvgContent();
+  const rootBounds = root.getBoundingClientRect();
+  if (!rootBounds.width || !rootBounds.height) throw new Error("تعذّر قياس مساحة لوحة SVG للتحقق.");
+  const graphics = Array.from(root.querySelectorAll<SVGGraphicsElement>(
+    "rect,circle,ellipse,line,path,polygon,polyline,image,text",
+  )).filter((element) => element.parentElement?.closest("defs") === null);
+  const textBoxes: Array<{ id: string; box: { x: number; y: number; width: number; height: number } }> = [];
+  for (const element of graphics) {
+    const bounds = element.getBoundingClientRect();
+    const box = {
+      x: (bounds.left - rootBounds.left) * CANVAS_WIDTH / rootBounds.width,
+      y: (bounds.top - rootBounds.top) * CANVAS_HEIGHT / rootBounds.height,
+      width: bounds.width * CANVAS_WIDTH / rootBounds.width,
+      height: bounds.height * CANVAS_HEIGHT / rootBounds.height,
+    };
+    const id = element.id || element.localName;
+    if (box.x < -1 || box.y < -1 || box.x + box.width > CANVAS_WIDTH + 1 || box.y + box.height > CANVAS_HEIGHT + 1) {
+      issues.push(`${id} يخرج عن مساحة اللوحة.`);
+    }
+    if (element.localName === "text" && element.textContent?.trim()) textBoxes.push({ id, box });
+  }
+  for (let first = 0; first < textBoxes.length; first += 1) {
+    for (let second = first + 1; second < textBoxes.length; second += 1) {
+      const a = textBoxes[first].box;
+      const b = textBoxes[second].box;
+      const intersection = Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x)) *
+        Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y));
+      const smallerArea = Math.min(a.width * a.height, b.width * b.height);
+      if (smallerArea > 0 && intersection / smallerArea > 0.12) {
+        issues.push(`النصان ${textBoxes[first].id} و${textBoxes[second].id} متداخلان.`);
+      }
+    }
+  }
+  return issues;
+}
+
+function findRenderedTextIssues(canvas: SVGCanvasApi, actions: EditorAction[]): string[] {
+  const expectedTexts = actions.filter((action) => action.type === "add" && action.shape === "text" && action.text?.trim());
+  const renderedTexts = Array.from(canvas.getSvgContent().querySelectorAll<SVGTextElement>("text"));
+  const issues: string[] = [];
+  for (const action of expectedTexts) {
+    const text = action.text?.trim() ?? "";
+    const matchingElements = renderedTexts.filter((element) => element.textContent?.trim() === text);
+    if (!matchingElements.length) {
+      issues.push(`لم يظهر النص المطلوب «${text}» كعنصر SVG قابل للعرض.`);
+      continue;
+    }
+    const visible = matchingElements.some((element) => {
+      const bounds = element.getBoundingClientRect();
+      const style = element.ownerDocument.defaultView?.getComputedStyle(element);
+      return bounds.width > 0 && bounds.height > 0 && style?.display !== "none" &&
+        style?.visibility !== "hidden" && Number(style?.opacity ?? 1) > 0 &&
+        (style?.fill !== "none" || style?.stroke !== "none");
+    });
+    if (!visible) issues.push(`النص «${text}» موجود لكنه غير مرئي في اللوحة.`);
+  }
+  return issues;
+}
+
+async function requestW2MProgram(
+  providerId: string,
+  message: string,
+  systemPrompt: string,
+  signal: AbortSignal,
+  onDelta: (text: string) => void,
+  onUsage: (usage: UsageSnapshot) => void,
+): Promise<string> {
+  let response: Response;
+  try {
+    response = await apiFetch(`${API_BASE}/api/chat/stream`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal,
+      body: JSON.stringify({ provider_id: providerId, message, system_prompt: systemPrompt, temperature: 0.15, max_tokens: 12000 }),
+    });
+  } catch (reason) {
+    if (reason instanceof TypeError) throw new BackendConnectionError();
+    throw reason;
+  }
+  if (!response.ok) {
+    const result = await response.json() as { detail?: string };
+    throw new Error(result.detail ?? `فشل الطلب (${response.status}).`);
+  }
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("البث غير متاح من الخادم.");
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let reply = "";
+  let finished = false;
+  while (!finished) {
+    let chunk: ReadableStreamReadResult<Uint8Array>;
+    try {
+      chunk = await reader.read();
+    } catch (reason) {
+      if (reason instanceof TypeError && !signal.aborted) throw new BackendConnectionError();
+      throw reason;
+    }
+    finished = chunk.done;
+    buffer += decoder.decode(chunk.value, { stream: !chunk.done });
+    const events = buffer.split("\n\n");
+    buffer = events.pop() ?? "";
+    for (const eventText of events) {
+      const dataLine = eventText.split(/\r?\n/).find((line) => line.startsWith("data:"));
+      if (!dataLine) continue;
+      const event = JSON.parse(dataLine.slice(5).trim()) as { type: string; text?: string; message?: string; usage?: UsageSnapshot };
+      if (event.type === "error") throw new Error(event.message ?? "تعذّر توليد الشعار.");
+      if (event.type === "done") {
+        finished = true;
+        continue;
+      }
+      if (event.type === "usage" && event.usage) onUsage(event.usage);
+      if (event.type === "delta" && event.text) {
+        reply += event.text;
+        onDelta(reply);
+      }
+    }
+  }
+  return reply;
+}
+
+class BackendConnectionError extends Error {
+  constructor() {
+    super("تعذّر الوصول إلى خادم AI TaskFlow. شغّل start-all.bat وانتظر رسالة جاهزية الخادم، ثم أعد المحاولة.");
+    this.name = "BackendConnectionError";
+  }
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, Number.isFinite(value) ? value : min));
 }
 
-function parseCompletedActions(reply: string): EditorAction[] {
-  if (/^\s*W2M\/2 DESIGN(?:\s|$)/i.test(reply)) {
-    const source = reply.trim();
-    const lines = source.split(/\r?\n/);
-    const tail = lines.at(-1)?.trim().toUpperCase();
-    if (!/(?:\r?\n)$/.test(source) && tail !== "END DESIGN" && tail !== "END W2M") lines.pop();
-    if (!lines.some((line) => /^END DESIGN$/i.test(line.trim()))) lines.push("END DESIGN");
-    if (!lines.some((line) => /^END W2M$/i.test(line.trim()))) lines.push("END W2M");
-    const parsed = parseW2MDesign(lines.join("\n"));
-    const attributeNames: Record<string, string> = {
-      X: "x", Y: "y", X2: "x2", Y2: "y2", WIDTH: "width", HEIGHT: "height",
-      RADIUS: "radius", POINTS: "points", PATH: "path", TEXT: "text", FILL: "fill",
-      STROKE: "stroke", STROKE_WIDTH: "strokeWidth", FONT_SIZE: "fontSize", FONT: "fontFamily",
-      DX: "dx", DY: "dy",
-    };
-    return parsed.actions.map((item) => {
-      const { type, shape, id, target, toolId, assetId, angle, factor, dx, dy, ...rest } = item;
-      const fields: Record<string, string | number> = {};
-      for (const [key, value] of Object.entries(rest)) {
-        const normalized = attributeNames[key];
-        if (normalized) fields[normalized] = value;
-      }
-      if (type === "update") {
-        const attributes = Object.fromEntries(Object.entries(rest).flatMap(([key, value]) => {
-          const names: Record<string, string> = {
-            FILL: "fill", STROKE: "stroke", STROKE_WIDTH: "stroke-width", OPACITY: "opacity",
-            FONT_SIZE: "font-size", FONT: "font-family", TEXT_ANCHOR: "text-anchor",
-            X: "x", Y: "y", WIDTH: "width", HEIGHT: "height", RADIUS: "r", TEXT: "#text",
-          };
-          return names[key] ? [[names[key], value]] : [];
-        }));
-        return { type, target: String(target ?? ""), attributes } as EditorAction;
-      }
-      if (type === "add" && ["rect", "circle", "ellipse", "line", "text", "path", "polygon"].includes(String(shape))) {
-        return { type, shape: String(shape) as EditorAction["shape"], id: String(id ?? ""), ...fields } as EditorAction;
-      }
-      if (type === "add-image") return { type, assetId: String(assetId ?? ""), ...fields } as EditorAction;
-      if (["move", "delete", "select", "front", "back"].includes(String(type))) {
-        return { type, target: String(target ?? ""), dx: Number(dx ?? fields.dx ?? 0), dy: Number(dy ?? fields.dy ?? 0) } as EditorAction;
-      }
-      if (type === "rotate") return { type, target: String(target ?? ""), angle: Number(angle ?? 0) } as EditorAction;
-      if (type === "tool") return { type, toolId: String(toolId ?? "") } as EditorAction;
-      if (type === "zoom") return { type, factor: Number(factor ?? 1) } as EditorAction;
-      if (type === "pan") return { type, dx: Number(dx ?? 0), dy: Number(dy ?? 0) } as EditorAction;
-      throw new Error("تعذر تحويل أمر W2M إلى إجراء SVG-Edit.");
-    });
-  }
-  const actionsMatch = /"actions"\s*:\s*\[/i.exec(reply);
-  if (!actionsMatch) return [];
-  const arrayStart = reply.indexOf("[", actionsMatch.index);
-  const actions: EditorAction[] = [];
-  let objectStart = -1;
-  let depth = 0;
-  let inString = false;
-  let escaped = false;
-
-  for (let index = arrayStart + 1; index < reply.length; index += 1) {
-    const character = reply[index];
-    if (inString) {
-      if (escaped) escaped = false;
-      else if (character === "\\") escaped = true;
-      else if (character === '"') inString = false;
-      continue;
-    }
-    if (character === '"') inString = true;
-    else if (character === "{") {
-      if (depth === 0) objectStart = index;
-      depth += 1;
-    } else if (character === "}" && depth > 0) {
-      depth -= 1;
-      if (depth === 0 && objectStart >= 0) {
-        try {
-          const action = JSON.parse(reply.slice(objectStart, index + 1)) as EditorAction;
-          if (action && typeof action.type === "string") actions.push(action);
-        } catch {
-          // Ignore incomplete or malformed actions while the model is streaming.
+function parseW2MDesignProgram(reply: string): { title: string; actions: EditorAction[] } {
+  const parsed = parseW2MDesign(reply);
+  const attributeNames: Record<string, string> = {
+    X: "x", Y: "y", X2: "x2", Y2: "y2", WIDTH: "width", HEIGHT: "height",
+    RADIUS: "radius", POINTS: "points", PATH: "path", TEXT: "text", FILL: "fill",
+    STROKE: "stroke", STROKE_WIDTH: "strokeWidth", FONT_SIZE: "fontSize", FONT: "fontFamily",
+    TEXT_ANCHOR: "textAnchor", DX: "dx", DY: "dy",
+  };
+  const actions = parsed.actions.map((item): EditorAction => {
+    const { type, shape, id, target, toolId, assetId, angle, factor, dx, dy, ...rest } = item;
+    const fields: Record<string, string | number> = {};
+    for (const [key, value] of Object.entries(rest)) {
+      if (key === "TEXT_ANCHOR") {
+        if (value !== "start" && value !== "middle" && value !== "end") {
+          throw new Error("محاذاة النص يجب أن تكون start أو middle أو end.");
         }
-        objectStart = -1;
+        fields.textAnchor = value;
+        continue;
       }
-    } else if (character === "]" && depth === 0) {
-      break;
+      const normalized = attributeNames[key];
+      if (normalized) fields[normalized] = value;
     }
-  }
-  return actions;
-}
-
-function parseDesignTitle(reply: string) {
-  const match = /"title"\s*:\s*("(?:\\.|[^"\\])*")/.exec(reply);
-  if (!match) return "";
-  try {
-    const title = JSON.parse(match[1]) as unknown;
-    return typeof title === "string" ? title.slice(0, 60) : "";
-  } catch {
-    return "";
-  }
+    if (type === "update") {
+      const attributes = Object.fromEntries(Object.entries(rest).flatMap(([key, value]) => {
+        const names: Record<string, string> = {
+          FILL: "fill", STROKE: "stroke", STROKE_WIDTH: "stroke-width", OPACITY: "opacity",
+          FONT_SIZE: "font-size", FONT: "font-family", TEXT_ANCHOR: "text-anchor",
+          X: "x", Y: "y", WIDTH: "width", HEIGHT: "height", RADIUS: "r", TEXT: "#text",
+        };
+        return names[key] ? [[names[key], value]] : [];
+      }));
+      return { type, target: String(target ?? ""), attributes };
+    }
+    if (type === "add" && ["rect", "circle", "ellipse", "line", "text", "path", "polygon"].includes(String(shape))) {
+      return { type, shape: String(shape) as EditorAction["shape"], id: String(id ?? ""), ...fields };
+    }
+    if (type === "add-image") return { type, assetId: String(assetId ?? ""), ...fields };
+    if (type === "move" || type === "delete" || type === "select" || type === "front" || type === "back") {
+      return { type, target: String(target ?? ""), dx: Number(dx ?? fields.dx ?? 0), dy: Number(dy ?? fields.dy ?? 0) };
+    }
+    if (type === "rotate") return { type, target: String(target ?? ""), angle: Number(angle ?? 0) };
+    if (type === "tool") return { type, toolId: String(toolId ?? "") };
+    if (type === "zoom") return { type, factor: Number(factor ?? 1) };
+    if (type === "pan") return { type, dx: Number(dx ?? 0), dy: Number(dy ?? 0) };
+    throw new Error("تعذر تحويل أمر W2M إلى إجراء SVG-Edit.");
+  });
+  return { title: parsed.title, actions };
 }
 
 function readAvailableTools(frameDocument: Document | null | undefined): SVGTool[] {
@@ -569,12 +738,14 @@ function executeEditorAction(canvas: SVGCanvasApi, action: EditorAction, frameDo
     } else if (shape === "text") {
       attr.x = x; attr.y = y; attr["font-size"] = clamp(action.fontSize ?? 36, 10, 160);
       attr["font-family"] = (action.fontFamily ?? "Cairo, sans-serif").slice(0, 80);
+      if (action.textAnchor) attr["text-anchor"] = action.textAnchor;
       const element = canvas.addSVGElementsFromJson({ element: "text", attr, children: [(action.text ?? "علامتك").slice(0, 120)] });
       addUndoableElement(canvas, element, `إضافة نص ${element.textContent?.slice(0, 28) ?? ""}`);
       return `أضاف نصًا: ${element.textContent?.slice(0, 30) ?? ""}`;
     } else if (shape === "path") {
       if (!action.path || !sanitizePath(action.path)) throw new Error("مسار SVG مرفوض: الصيغة غير آمنة أو طويلة.");
       attr.d = action.path;
+      if (x || y) attr.transform = `translate(${x} ${y})`;
     } else if (shape === "polygon") {
       const points = action.points ?? "";
       if (points.length > 1000 || !/^[0-9eE+.,\s-]+$/.test(points)) throw new Error("نقاط المضلع غير صالحة.");
@@ -677,6 +848,10 @@ export default function SVGLogoStudio({ initialSvg, initialTitle, onChange, onTi
   const [imageLoading, setImageLoading] = useState(false);
   const imageSearchRequestRef = useRef(0);
   const [imageLibraryVisible, setImageLibraryVisible] = useState(() => localStorage.getItem("taskflow-logo-library-hidden") !== "true");
+  const [visionStatus, setVisionStatus] = useState<LocalVisionStatus | null>(null);
+  const [visionDownloading, setVisionDownloading] = useState(false);
+  const [visionDownloadProgress, setVisionDownloadProgress] = useState<ModelDownloadStatus | null>(null);
+  const [visionReference, setVisionReference] = useState<{ name: string; dataUrl: string } | null>(null);
   const [toolbarBusy, setToolbarBusy] = useState(false);
   const [rotationDegrees, setRotationDegrees] = useState("0");
   const [actualUsage, setActualUsage] = useState<UsageSnapshot>({ prompt_tokens: 0, completion_tokens: 0, total_tokens: 0, credits: 0 });
@@ -760,6 +935,22 @@ export default function SVGLogoStudio({ initialSvg, initialTitle, onChange, onTi
     return () => { active = false; };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    apiFetch(`${API_BASE}/api/w2m/vision/status`)
+      .then(async (response) => {
+        if (!response.ok) throw new Error("تعذّر تحميل حالة محرك الرؤية المحلي.");
+        return response.json() as Promise<LocalVisionStatus>;
+      })
+      .then((result) => {
+        if (active) setVisionStatus(result);
+      })
+      .catch((reason: unknown) => {
+        if (active) setError(reason instanceof Error ? reason.message : "تعذّر تحميل حالة محرك الرؤية المحلي.");
+      });
+    return () => { active = false; };
+  }, []);
+
   useEffect(() => () => {
     window.clearTimeout(saveTimerRef.current);
     const canvas = editorRef.current?.svgCanvas;
@@ -822,6 +1013,43 @@ export default function SVGLogoStudio({ initialSvg, initialTitle, onChange, onTi
 
   function stopGeneration() {
     abortRef.current?.abort();
+  }
+
+  async function installLocalVision() {
+    setVisionDownloading(true);
+    setError("");
+    try {
+      const result = await runTrackedDownload("florence-2", async () => {
+        const response = await apiFetch(`${API_BASE}/api/w2m/vision/download`, { method: "POST" });
+        const value = await response.json() as LocalVisionStatus & { detail?: string };
+        if (!response.ok) throw new Error(value.detail ?? "تعذّر تنزيل نموذج Florence-2.");
+        return value;
+      }, setVisionDownloadProgress);
+      setVisionStatus(result);
+      setNotice("تم تثبيت نموذج الرؤية المحلي. يعمل على هذا الجهاز ولا يرسل الصور إلى مزوّد AI.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "تعذّر تثبيت نموذج الرؤية المحلي.");
+    } finally {
+      setVisionDownloading(false);
+    }
+  }
+
+  async function selectVisionReference(file: File | undefined) {
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setError("الصورة المرجعية يجب أن تكون JPEG أو PNG أو WebP.");
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      setError("حجم الصورة المرجعية يجب ألا يتجاوز 4 ميغابايت.");
+      return;
+    }
+    try {
+      setVisionReference({ name: file.name, dataUrl: await readImageDataUrl(file) });
+      setError("");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "تعذّرت قراءة الصورة المرجعية.");
+    }
   }
 
   async function searchLibrary(queryOverride?: string) {
@@ -974,13 +1202,13 @@ export default function SVGLogoStudio({ initialSvg, initialTitle, onChange, onTi
     setResponseTab("activity");
     let reply = "";
     let executedActions = 0;
-    let addedElements = 0;
-    let insertedImage = false;
+    let failedActions = 0;
     let timedOut = false;
+    let designModified = false;
     let activityId = 0;
     const frameDocument = frameRef.current?.contentDocument;
     const tools = readAvailableTools(frameDocument);
-    const inventory = describeArtwork(canvas);
+    const initialSvg = canvas.getSvgString();
     const requestPrompt = overridePrompt.trim() || "أنشئ شعارًا مستندًا إلى محتوى الملفات المرفقة.";
     let availableLibraryAssets = imageLibrary;
     const imageDecision = "For posters or branded scenes that mention real food/products/people/places, one relevant live image is required when a matching asset is provided. Add it with add-image using the exact assetId, large editorial dimensions, preserveAspectRatio semantics, and send it behind text with type=back afterward. Do not use a photo for abstract logos unless it clearly improves the design. Never invent assetId or image URLs.";
@@ -988,159 +1216,113 @@ export default function SVGLogoStudio({ initialSvg, initialTitle, onChange, onTi
     const generationTimeout = window.setTimeout(() => {
       timedOut = true;
       controller.abort();
-    }, 600_000);
+    }, 900_000);
     try {
-      setProgress({ stage: 0, name: "ينشئ عناصر الشعار مباشرة" });
-      abortRef.current = controller;
+      if (!visionStatus?.installed) {
+        throw new Error("ثبّت نموذج Florence-2 المحلي أولًا لتفعيل تحليل الصور والتحقق البصري في W2M.");
+      }
+      if (!frameDocument) throw new Error("تعذّر الوصول إلى أدوات SVG-Edit داخل الإطار.");
+      let referenceAnalysis: LocalVisionAnalysis | null = null;
+      if (visionReference) {
+        setProgress({ stage: 0, name: "يحلل الصورة المرجعية محليًا" });
+        referenceAnalysis = await analyzeWithLocalVision(visionReference.dataUrl);
+      }
       const inferredImageQuery = inferImageSearchQuery(requestPrompt);
       if (inferredImageQuery) {
-        try {
-          setProgress({ stage: 0, name: `بحث الصور: ${inferredImageQuery}` });
-          availableLibraryAssets = await searchCommons(inferredImageQuery);
-          if (availableLibraryAssets.length) setImageLibrary(availableLibraryAssets);
-        } catch {
-          availableLibraryAssets = [];
-        }
+        setProgress({ stage: 0, name: `بحث الصور: ${inferredImageQuery}` });
+        availableLibraryAssets = await searchCommons(inferredImageQuery);
+        if (availableLibraryAssets.length) setImageLibrary(availableLibraryAssets);
       } else if (!availableLibraryAssets.length) {
         availableLibraryAssets = [];
       }
-      setProgress({ stage: 0, name: "ينفذ التوليد والأدوات مباشرة" });
       const visibleTools = tools.filter((tool) => tool.visible);
       const toolsForAI = visibleTools.length ? visibleTools : tools;
-      const libraryPreview = availableLibraryAssets.slice(0, 12);
-      const request = `${requestPrompt}${documentsAsContext(documents)}\n\nVisible native SVG-Edit tools the AI may activate:\n${JSON.stringify(toolsForAI)}\n\nCurrent editor document (${inventory.length} editable elements; use these exact IDs for edits):\n${JSON.stringify(inventory)}\n\n${imageDecision}\nAvailable image assets (use only exact assetId values; do not invent IDs):\n${JSON.stringify(libraryPreview)}`;
-      const response = await apiFetch(`${API_BASE}/api/chat/stream`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify({
-          provider_id: providerId,
-          message: request,
-          system_prompt: `${LOGO_SYSTEM_PROMPT}\n${NATIVE_TOOL_PROMPT}\nIMPORTANT: First plan a grid and a bounding box for every object. Keep all geometry within x=0..${CANVAS_WIDTH}, y=0..${CANVAS_HEIGHT}; align repeated edges and baselines; preserve generous safe margins; size text to fit its zone. For a logo create a centered, balanced mark and wordmark. For a poster assign separate, measured zones to title, image, and details. Use a concise set of 8-36 commands, never place objects randomly or overlap unrelated elements. Return a complete valid W2M/2 DESIGN program only.`,
-          temperature: 0.15,
-          max_tokens: 12000,
-        }),
-      });
-      if (!response.ok) {
-        const result = await response.json() as { detail?: string };
-        throw new Error(result.detail ?? `فشل الطلب (${response.status}).`);
-      }
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error("البث غير متاح من الخادم.");
-
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let finished = false;
-      while (!finished) {
-        const chunk = await reader.read();
-        finished = chunk.done;
-        buffer += decoder.decode(chunk.value, { stream: !chunk.done });
-        const events = buffer.split("\n\n");
-        buffer = events.pop() ?? "";
-        for (const eventText of events) {
-          const dataLine = eventText.split(/\r?\n/).find((line) => line.startsWith("data:"));
-          if (!dataLine) continue;
-          const event = JSON.parse(dataLine.slice(5).trim()) as { type: string; text?: string; message?: string; usage?: UsageSnapshot };
-          if (event.type === "error") throw new Error(event.message ?? "تعذّر توليد الشعار.");
-          if (event.type === "done") {
-            finished = true;
-            continue;
-          }
-          if (event.type === "usage" && event.usage) {
-            setActualUsage({
-              prompt_tokens: Number(event.usage.prompt_tokens ?? 0),
-              completion_tokens: Number(event.usage.completion_tokens ?? 0),
-              total_tokens: Number(event.usage.total_tokens ?? 0),
-              credits: Number(event.usage.credits ?? 0),
-            });
-          }
-          if (event.type !== "delta" || !event.text) continue;
-
-          reply += event.text;
-          setAiRawReply(reply);
-          const actions = parseCompletedActions(reply).slice(0, 64);
-          while (executedActions < actions.length) {
-            const action = actions[executedActions];
-            executedActions += 1;
-            setProgress({ stage: executedActions, name: action.type });
-            try {
-              if (action.type === "add") {
-                addedElements += 1;
-                if (addedElements > 48) throw new Error("تم الوصول إلى حد الإضافات المسموح لهذا الطلب.");
-              }
-              editor.leftPanel.clickSelect();
-              if (!frameDocument) throw new Error("تعذّر الوصول إلى أدوات SVG-Edit داخل الإطار.");
-              let resolvedAction = action;
-              if (action.type === "add-image" && action.assetId) {
-                const libraryAsset = availableLibraryAssets.find((asset) => asset.id === action.assetId);
-                if (!libraryAsset) throw new Error(`لم أجد صورة مكتبة مسجلة باسم ${action.assetId}.`);
-                resolvedAction = { ...action, href: libraryAsset.dataUri ?? (await loadEmbeddedThumbnail(libraryAsset)) };
-              }
-              const label = executeEditorAction(canvas, resolvedAction, frameDocument, onChangeRef.current);
-              if (action.type === "add-image") insertedImage = true;
-              setActivity((current) => [...current.slice(-11), { id: ++activityId, text: label, state: "done" }]);
-              await new Promise((resolve) => window.setTimeout(resolve, 90));
-            } catch (reason) {
-              const message = reason instanceof Error ? reason.message : "رفض المحرر هذا الإجراء.";
-              setActivity((current) => [...current.slice(-11), { id: ++activityId, text: message, state: "rejected" }]);
-            }
-          }
+      const libraryCandidates = await Promise.all(availableLibraryAssets.slice(0, 4).map(async (asset) => {
+        setProgress({ stage: 0, name: "يفحص صور المكتبة محليًا" });
+        const image = asset.dataUri ?? await loadEmbeddedThumbnail(asset);
+        const analysis = await analyzeWithLocalVision(image, "caption");
+        return { id: asset.id, title: asset.title, license: asset.license, author: asset.author, visualDescription: analysis.caption };
+      }));
+      availableLibraryAssets = availableLibraryAssets.slice(0, libraryCandidates.length);
+      const baseSystemPrompt = `${LOGO_SYSTEM_PROMPT}\n${NATIVE_TOOL_PROMPT}\nIMPORTANT: First plan a grid and a bounding box for every object. Keep all geometry within x=0..${CANVAS_WIDTH}, y=0..${CANVAS_HEIGHT}; align repeated edges and baselines; preserve generous safe margins; size text to fit its zone. For a logo create a centered, balanced mark and wordmark. For a poster assign separate, measured zones to title, image, and details. Use a concise set of 8-36 commands, never place objects randomly or overlap unrelated elements. Return a complete valid W2M/2 DESIGN program only.`;
+      let correctionFeedback = "";
+      let verifiedAnalysis: LocalVisionAnalysis | null = null;
+      let title = "";
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        if (attempt > 0) {
+          await editor.loadFromString(initialSvg, { noAlert: true });
+          setActivity([{ id: ++activityId, text: "فشل التحقق البصري، يعيد W2M المحاولة", state: "rejected" }]);
         }
-      }
-
-      if (!executedActions) {
-        const fallbackTitle = requestPrompt.slice(0, 24).trim() || "AI TaskFlow";
-        const fallbackActions: EditorAction[] = [
-          { type: "add", shape: "rect", id: "fallback-badge", x: 430, y: 270, width: 340, height: 220, fill: "#7c3cff", stroke: "#ffffff", strokeWidth: 8 },
-          { type: "add", shape: "circle", id: "fallback-mark", x: 600, y: 380, radius: 62, fill: "#ffffff", stroke: "#a78bfa", strokeWidth: 10 },
-          { type: "add", shape: "text", id: "fallback-title", x: 600, y: 390, text: fallbackTitle, fill: "#ffffff", fontSize: 30, fontFamily: "Arial" },
-        ];
-        for (const action of fallbackActions) {
+        const inventory = describeArtwork(canvas);
+        const request = `${requestPrompt}${documentsAsContext(documents)}\n\nLive SVG-Edit tools:\n${JSON.stringify(toolsForAI)}\n\nCurrent editable layers (use exact IDs):\n${JSON.stringify(inventory)}\n\n${imageDecision}\nLibrary candidates analyzed locally by Florence-2; choose only an exact listed ID when relevant:\n${JSON.stringify(libraryCandidates)}\n\nLocal visual analysis of the user's reference image:\n${JSON.stringify(referenceAnalysis)}\n\n${correctionFeedback ? `Local post-render verification feedback. Correct these issues and return the entire updated program:\n${correctionFeedback}` : "Create the requested design from scratch or edit the current layers."}`;
+        setProgress({
+          stage: 0,
+          name: attempt ? "يعيد W2M التخطيط بصريًا" : "يجهّز W2M التصميم عبر المزوّد",
+        });
+        reply = await requestW2MProgram(providerId, request, baseSystemPrompt, controller.signal, setAiRawReply, (usage) => {
+          setActualUsage({
+            prompt_tokens: Number(usage.prompt_tokens ?? 0),
+            completion_tokens: Number(usage.completion_tokens ?? 0),
+            total_tokens: Number(usage.total_tokens ?? 0),
+            credits: Number(usage.credits ?? 0),
+          });
+        });
+        const parsed = parseW2MDesignProgram(reply);
+        const resolvedActions = await Promise.all(parsed.actions.map(async (action): Promise<EditorAction> => {
+          if (action.type !== "add-image") return action;
+          const libraryAsset = availableLibraryAssets.find((asset) => asset.id === action.assetId);
+          if (!libraryAsset) throw new Error(`لم أجد صورة مكتبة مسجلة باسم ${action.assetId ?? ""}.`);
+          return { ...action, href: libraryAsset.dataUri ?? await loadEmbeddedThumbnail(libraryAsset) };
+        }));
+        let attemptExecuted = 0;
+        let attemptFailed = 0;
+        let addedElements = 0;
+        for (const action of resolvedActions) {
+          setProgress({ stage: attemptExecuted + attemptFailed + 1, name: action.type });
           try {
-            if (!frameDocument) throw new Error("تعذّر الوصول إلى محرر SVG.");
+            if (action.type === "add" && addedElements >= 48) throw new Error("تم الوصول إلى حد الإضافات المسموح لهذا الطلب.");
+            editor.leftPanel.clickSelect();
             const label = executeEditorAction(canvas, action, frameDocument, onChangeRef.current);
-            executedActions += 1;
-            addedElements += 1;
+            attemptExecuted += 1;
+            designModified = true;
+            if (action.type === "add") addedElements += 1;
             setActivity((current) => [...current.slice(-11), { id: ++activityId, text: label, state: "done" }]);
+            await new Promise((resolve) => window.setTimeout(resolve, 90));
           } catch (reason) {
-            const message = reason instanceof Error ? reason.message : "تعذر إنشاء عنصر احتياطي.";
-            setActivity((current) => [...current.slice(-11), { id: ++activityId, text: message, state: "rejected" }]);
+            attemptFailed += 1;
+            setActivity((current) => [...current.slice(-11), { id: ++activityId, text: reason instanceof Error ? reason.message : "رفض المحرر هذا الإجراء.", state: "rejected" }]);
           }
         }
-        if (!executedActions) throw new Error("لم يستطع المزوّد ولا التصميم الاحتياطي إنشاء عناصر على اللوحة.");
-        setNotice("استخدم التطبيق تصميمًا احتياطيًا آمنًا لأن رد المزوّد لم ينتج عناصر قابلة للتنفيذ.");
-      }
-      const finalImageQuery = inferImageSearchQuery(requestPrompt);
-      if (!insertedImage && finalImageQuery && availableLibraryAssets.length) {
-        try {
-          const asset = availableLibraryAssets[0];
-          const href = asset.dataUri ?? await loadEmbeddedThumbnail(asset);
-          const imageAction: EditorAction = {
-            type: "add-image",
-            assetId: asset.id,
-            href,
-            id: "ai-photo-main",
-            x: 300,
-            y: 130,
-            width: 600,
-            height: 500,
-          };
-          executeEditorAction(canvas, imageAction, frameDocument, onChangeRef.current);
-          executeEditorAction(canvas, { type: "back" }, frameDocument, onChangeRef.current);
-          insertedImage = true;
-          executedActions += 1;
-          setActivity((current) => [...current.slice(-11), { id: ++activityId, text: `تم إدراج الصورة المناسبة تلقائيًا: ${asset.title}`, state: "done" }]);
-        } catch (reason) {
-          setActivity((current) => [...current.slice(-11), { id: ++activityId, text: reason instanceof Error ? reason.message : "تعذّر إدراج الصورة الاحتياطية.", state: "rejected" }]);
+        if (!attemptExecuted) throw new Error("لم يستطع محرر SVG-Edit تنفيذ أي أمر من برنامج W2M.");
+        setProgress({ stage: 0, name: "يتحقق بصريًا من التصميم النهائي" });
+        verifiedAnalysis = await analyzeWithLocalVision(await renderSvgPreview(serializeWorkspaceSvg(canvas)));
+        const issues = [...findLayoutIssues(canvas), ...findRenderedTextIssues(canvas, resolvedActions)];
+        if (attemptFailed) issues.push(`تعذر على المحرر تنفيذ ${attemptFailed} أمرًا.`);
+        executedActions = attemptExecuted;
+        failedActions = attemptFailed;
+        title = parsed.title;
+        if (!issues.length) break;
+        correctionFeedback = JSON.stringify({
+          detectedIssues: issues,
+          renderedImageCaption: verifiedAnalysis.caption,
+          detectedObjects: verifiedAnalysis.objects,
+          detectedTextRegions: verifiedAnalysis.text_regions,
+          instruction: "Revise positions, sizes, and layer ordering. Keep all objects within the artboard and prevent text-on-text overlap.",
+        });
+        if (attempt === 2) {
+          await editor.loadFromString(initialSvg, { noAlert: true });
+          throw new Error(`لم يجتز التصميم التحقق البصري بعد محاولتي تصحيح. أُعيدت اللوحة إلى ما قبل الطلب. ${issues.join(" ")}`);
         }
       }
-      const design = parseW2MDesign(reply);
-      const title = design.title || parseDesignTitle(reply);
       if (title) {
         setDesignTitle(title);
         onTitleChangeRef.current(title);
       }
-      setNotice(`أنهى AI تنفيذ ${executedActions} أمرًا داخل المحرر. يمكنك تعديلها يدويًا أو التراجع من أدوات SVG-Edit.`);
+      const visionSummary = verifiedAnalysis
+        ? ` Florence-2 محليًا: ${verifiedAnalysis.caption.slice(0, 180)} · ${verifiedAnalysis.objects.length} عنصر مرئي و${verifiedAnalysis.text_regions.length} منطقة نصية.`
+        : "";
+      setNotice(`أنهى W2M التحقق المحلي وتنفيذ ${executedActions} أمرًا داخل المحرر${failedActions ? `، وتعذر تنفيذ ${failedActions} أمرًا` : ""}.${visionSummary} الصور لم تُرسل إلى مزوّد AI.`);
+      designModified = false;
       try {
         const svg = serializeWorkspaceSvg(canvas);
         const safeName = sanitizeArtifactFilename(title || "TaskFlow design", "TaskFlow design");
@@ -1155,15 +1337,20 @@ export default function SVGLogoStudio({ initialSvg, initialTitle, onChange, onTi
       }
       setPrompt("");
       setDocuments([]);
+      setVisionReference(null);
     } catch (reason) {
+      if (designModified) await editor.loadFromString(initialSvg, { noAlert: true });
       if (reason instanceof DOMException && reason.name === "AbortError") {
         if (timedOut) {
-          setError(`انتهت مهلة التوليد بعد 10 دقائق${reply.trim() ? ". وصل رد جزئي ولم يكتمل JSON؛ أعد المحاولة بمهمة أقصر." : ". لم يصل رد كامل من مزوّد AI."}`);
+          setError(`انتهت مهلة التوليد بعد 15 دقيقة${reply.trim() ? ". وصل رد W2M جزئي ولم يكتمل؛ أعد المحاولة بمهمة أقصر." : ". لم يصل رد كامل من مزوّد AI."}`);
         } else {
-          setNotice("أوقفت التوليد. بقيت المراحل المنجزة في المحرر.");
+          setNotice("أوقفت التوليد وأُعيدت اللوحة إلى ما قبل الطلب.");
         }
       } else {
-        setError(reason instanceof Error ? reason.message : "تعذّر إنشاء الشعار.");
+        const message = reason instanceof BackendConnectionError
+          ? `${translate(reason.message, language)} (${API_BASE})`
+          : reason instanceof Error ? reason.message : "تعذّر إنشاء الشعار.";
+        setError(message);
       }
     } finally {
       window.clearTimeout(generationTimeout);
@@ -1185,10 +1372,48 @@ export default function SVGLogoStudio({ initialSvg, initialTitle, onChange, onTi
         <button type="button" className="svg-logo-save" onClick={saveLocally} disabled={!editorReady}><Save size={15} /> {translate("حفظ الآن", language)}</button>
       </header>
 
+      <div className={`svg-logo-editor${generating ? " generating" : ""}`} role="region" aria-label={translate("لوحة الرسم", language)}>
+        {!editorReady && <div className="svg-logo-loading"><LoaderCircle className="svg-logo-spin" size={20} /><span>{translate("جارٍ تحميل المحرر...", language)}</span></div>}
+        <iframe
+          ref={frameRef}
+          title={translate("محرر الرسوم المتجهة", language)}
+          src="/vendor/svgedit/index.html?lang=en&dimensions=1200,760&canvas_expansion=0&show_outside_canvas=false"
+          onLoad={() => void handleEditorLoad()}
+          style={{ visibility: editorReady ? "visible" : "hidden" }}
+        />
+      </div>
+      <footer className="svg-logo-attribution">SVG-Edit 7.4.2 · <a href="https://github.com/SVG-Edit/svgedit" target="_blank" rel="noreferrer">{translate("المستودع والترخيص", language)}</a></footer>
+
       <form className="svg-logo-ai" onSubmit={(event) => void generateLogo(event)}>
         <div className="svg-logo-ai-title"><WandSparkles size={16} /><strong>{translate("مساعد داخل المحرر", language)}</strong><small>{translate("يرسم ويعدّل ويستخدم", language)} {editorTools.length} {translate("أداة أصلية", language)}</small></div>
         <textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder={translate("اسم العلامة ونشاطها وجمهورها وأسلوبها وألوانها؛ مثال: شعار هندسي أنيق لمحمصة قهوة باسم نواة، أخضر زمردي ونحاسي...", language)} rows={2} maxLength={3000} />
         <div className="svg-logo-documents"><DocumentAttachments documents={documents} onChange={setDocuments} disabled={generating} /></div>
+        <section className="svg-logo-vision" aria-label="W2M local vision">
+          <div>
+            <strong>{translate("رؤية W2M المحلية · Florence-2", language)}</strong>
+            <small>{visionStatus && !visionStatus.runtime_ready
+              ? translate("أعد تشغيل التطبيق لتثبيت مكونات الرؤية المحلية.", language)
+              : visionStatus?.installed
+              ? `${translate("جاهز للتحليل والتحقق البصري", language)} · ${(visionStatus.size_bytes / 1_000_000).toFixed(0)} MB · ${translate("تبقى الصور على الجهاز", language)}`
+              : translate("نزّل نموذج ONNX مرة واحدة (حتى 500 MB) لاستخدام التحليل والتحقق المحلي.", language)}</small>
+            <small>{translate("المزوّد المختار يولّد الأوامر وW2M ينفّذها؛ Florence-2 للتحليل البصري والتحقق فقط.", language)}</small>
+          </div>
+          {!visionStatus?.installed && <button type="button" onClick={() => void installLocalVision()} disabled={visionDownloading || generating || visionStatus?.runtime_ready === false}>
+            {visionDownloading ? <LoaderCircle className="svg-logo-spin" size={14} /> : <Download size={14} />}
+            {visionDownloading ? translate("جارٍ تنزيل النموذج...", language) : visionStatus?.runtime_ready === false
+              ? translate("المحرك غير جاهز", language)
+              : translate("تثبيت محرك الرؤية", language)}
+          </button>}
+          {visionDownloading && <ModelDownloadProgress progress={visionDownloadProgress} label={translate("تنزيل Florence-2 المحلي", language)} />}
+          <label>
+            <span>{visionReference ? `${translate("مرجع بصري", language)}: ${visionReference.name}` : translate("إرفاق صورة مرجعية للتحليل المحلي", language)}</span>
+            <input type="file" accept="image/jpeg,image/png,image/webp" disabled={generating || !visionStatus?.installed} onChange={(event) => {
+              void selectVisionReference(event.currentTarget.files?.[0]);
+              event.currentTarget.value = "";
+            }} />
+          </label>
+          {visionReference && <button type="button" className="svg-logo-vision-clear" onClick={() => setVisionReference(null)} disabled={generating}>{translate("إزالة المرجع", language)}</button>}
+        </section>
         <div className="svg-logo-ai-actions">
           <select aria-label={translate("مزوّد الذكاء الاصطناعي", language)} value={providerId} onChange={(event) => setProviderId(event.target.value)} disabled={!providers.length || generating}>
             {providers.map((provider) => <option key={provider.id} value={provider.id}>{provider.name} · {provider.model}</option>)}
@@ -1285,17 +1510,6 @@ export default function SVGLogoStudio({ initialSvg, initialTitle, onChange, onTi
         </div>
       </div>
 
-      <div className={`svg-logo-editor${generating ? " generating" : ""}`}>
-        {!editorReady && <div className="svg-logo-loading"><LoaderCircle className="svg-logo-spin" size={20} /><span>{translate("جارٍ تحميل المحرر...", language)}</span></div>}
-        <iframe
-          ref={frameRef}
-          title="AI-TENSORFLOW LOGO DESIGN TOOL"
-          src="/vendor/svgedit/index.html?lang=en&dimensions=1200,760&canvas_expansion=0&show_outside_canvas=false"
-          onLoad={() => void handleEditorLoad()}
-          style={{ visibility: editorReady ? "visible" : "hidden" }}
-        />
-      </div>
-      <footer className="svg-logo-attribution">SVG-Edit 7.4.2 · <a href="https://github.com/SVG-Edit/svgedit" target="_blank" rel="noreferrer">{translate("المستودع والترخيص", language)}</a></footer>
     </section>
   );
 }

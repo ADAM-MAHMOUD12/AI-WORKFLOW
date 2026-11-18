@@ -1,8 +1,8 @@
-<<<<<<< HEAD
-# AI TASKFLOW
-=======
-# OPENFILM-AI TASKFLOW EDITION
->>>>>>> f17599aa (feat: force add and sync all remaining project folders and files)
+# AI TASKFLOW EDITION
+
+[![Architecture diagram of adam-mahmoud12/ai-workflow](https://gitdiagram.com/adam-mahmoud12/ai-workflow/diagram.png)](https://gitdiagram.com/adam-mahmoud12/ai-workflow?utm_source=readme&utm_medium=picture)
+
+[![Architecture diagram](https://gitdiagram.com/diagram-badge.svg)](https://gitdiagram.com/adam-mahmoud12/ai-workflow?utm_source=readme&utm_medium=badge)
 
 [![Architecture diagram of adam-mahmoud12/ai-workflow](https://gitdiagram.com/adam-mahmoud12/ai-workflow/diagram.png)](https://gitdiagram.com/adam-mahmoud12/ai-workflow?utm_source=readme&utm_medium=picture)
 
@@ -20,7 +20,7 @@ AI TaskFlow combines task and project management with configurable AI providers,
 
 على Windows 10/11، شغّل المثبّت لإعداد البرنامج كاملًا، ثم افتحه من اختصار سطح المكتب أو قائمة Start. يتضمن المثبّت إصدارًا محمولًا من Python وNode.js وBun، ومكتبات الخلفية والواجهة والمحركات وملفات البناء اللازمة؛ لا يحتاج تثبيت التطبيق إلى WinGet أو تنزيل الاعتماديات. شغّل `start-all.bat` يدويًا فقط إذا أردت تشغيل المشروع من مجلده. يلزم اتصال الإنترنت عند استخدام مزوّد AI سحابي أو جلب محتوى خارجي.
 
-لتشغيل نسخة المصدر من موجه أوامر Windows (CMD)، شغّل `start-all.bat`. يفحص المشغّل الاعتماديات والمحركات، ويطلب موافقتك قبل تنزيل أي حزم ناقصة، ثم يختار المنافذ المتاحة ويعرض رابط الجهاز. استخدم `install-prerequisites.bat` إذا أردت فحص/إعداد المتطلبات دون تشغيل الخوادم.
+لتشغيل نسخة المصدر من موجه أوامر Windows (CMD)، شغّل `start-all.bat`. يبني المشغّل أحدث نسخة من المصدر، ويفحص الاعتماديات والمحركات المفعّلة، ويسألك قبل تثبيت أي مكوّن ناقص. بعد اختيار المنافذ ينتظر جاهزية الخدمات ثم يفتح رابط التطبيق الصحيح تلقائيًا. إذا رفضت تثبيت اعتماد ضروري لمحرك مفعّل، يُلغي التشغيل بدلًا من فتح واجهة لا تعمل بالكامل. يبدأ OpenFilm عند فتح قسم الموشن جرافيك. استخدم `install-prerequisites.bat` إذا أردت فحص/إعداد المتطلبات دون تشغيل الخوادم.
 
 ### استخدام الأقسام
 
@@ -28,9 +28,9 @@ AI TaskFlow combines task and project management with configurable AI providers,
 - **مزوّدو الذكاء الاصطناعي:** أضف مزوّدًا متوافقًا مع OpenAI أو Ollama، اختبر الاتصال، ثم اختره للمحادثة والأدوات.
 - **محادثة AI ومنظّم AI:** استخدم سياق مساحة العمل والمستندات لتوليد خطط أو جداول أو إجابات بحث. راجع النتائج قبل اعتماد التغييرات.
 - **مخطط التدفق والمهارات:** أنشئ مخططات العمل باستخدام صيغة W2M/2 الصارمة، واحفظ تعليمات قابلة لإعادة الاستخدام ليستدعيها المساعد لاحقًا.
-- **استوديو التصميم:** أنشئ أو عدّل شعارات SVG من خلال برنامج W2M/2 مضبوط الإحداثيات والطبقات، وابحث عن صور مرخّصة. راجع الإسناد والترخيص قبل النشر.
+- **استوديو التصميم:** أنشئ أو عدّل شعارات SVG من خلال برنامج W2M/2 مضبوط الإحداثيات والطبقات، وابحث عن صور مرخّصة. يمكن تثبيت Florence-2 ONNX (حتى 500 MB) لتحليل الصور المرجعية وصور المكتبة والتحقق محليًا من لقطة النتيجة؛ قد يُرسل وصف التحليل النصي للمزوّد المختار لتوليد البرنامج، ولا تُرسل الصور نفسها إليه من هذا المسار. تعرض تنزيلات Florence-2 وWhisper وأصوات Piper حجم النقل الفعلي والحجم الإجمالي والمتبقي.
 - **المخططات المعمارية:** أنشئ مخطط W2M/2، ثم عدّله في OpenCalque ثنائي الأبعاد أو حوّله إلى مشروع في محرر AI TaskFlow 3D.
-- **استوديو الموشن جرافيك:** أنشئ مشروع OpenFilm، وعدّل صفحات المشاهد والـTimeline داخل المحرر. تستخدم طبقة W2M/2 لغة نصية محدّدة القواعد، وتتحقق من بنية المشاهد ومددها ومراجع الـTimeline قبل الحفظ؛ ويمكنها إعادة طلب إصلاح المصدر عند فشل الترجمة. يمكن إرسال ثلاث لقطات من فيديو مرجعي إلى مزوّد AI؛ لا يُرسل الفيديو كاملًا. يبقى الفويس أوفر داخل المشروع، ويحلل FFmpeg الصوت محليًا ويرسل توقيتات المقاطع الهادئة فقط.
+- **استوديو الموشن جرافيك:** أنشئ مشروع OpenFilm، وعدّل صفحات المشاهد والـTimeline داخل المحرر. تستخدم طبقة W2M/2 لغة نصية محدّدة القواعد، وتتحقق من بنية المشاهد ومددها ومراجع الـTimeline قبل الحفظ؛ ويمكنها إعادة طلب إصلاح المصدر عند فشل الترجمة. يستخرج التطبيق ثلاث لقطات من الفيديو محليًا ويحللها Florence-2؛ لا يُرفع الفيديو، وإذا لم يدعم المزوّد الصور تُرسل الأوصاف النصية المحلية بدلًا منها. يبقى الفويس أوفر داخل المشروع، ويحلل FFmpeg الصوت محليًا ويرسل توقيتات المقاطع الهادئة فقط.
 - **تسليم Telegram:** بعد إنشاء نتيجة قابلة للتصدير، يمكن إرسال ملفها إلى البوت إذا أُعدّ وربط البوت بحسابك؛ لا يُرسل شيء تلقائيًا عند غياب الربط.
 - **Markdown ومركز المساعدة:** اكتب المستندات، واطلب من AI مراجعتها، واستخدم مركز المساعدة للخطوات التفصيلية.
 
@@ -50,9 +50,9 @@ AI TaskFlow combines task and project management with configurable AI providers,
 2. تحوّل استجابة النموذج إلى صيغة القسم: `taskflow-actions` للمحادثة وأوامر مساحة العمل، وW2M/2 للمخطط التدفق والجداول والتصميم والمخططات المعمارية ومشروعات OpenFilm.
 3. تتحقق من نوع الأمر والحقول والمعرّفات والحدود والبنية قبل التنفيذ؛ وتمنع تمرير نص حر إلى عمليات التطبيق أو المحرك كأمر غير مقيّد.
 4. يطبّق منفّذ الأوامر التغييرات الموافق عليها على مساحة العمل أو يرسل هندسة المشهد إلى المحرك، ثم يحفظ بيانات التطبيق في قاعدة البيانات.
-5. لكل قسم قواعد وأوامر مختلفة؛ تعرض الواجهة البرنامج النصي والنتيجة في تبويبين. تتحقق المحللات من الحقول والأنواع والحدود والمراجع قبل تطبيق المخطط أو تصميم SVG أو تحرير المشروع. في OpenFilm، يتحقق المترجم أيضًا من تسلسل الصفحات وبنية HTML و`window.film.frame(t)` ومدد المشاهد واتصال الـTimeline قبل الحفظ. هذه الفحوص تقلل أخطاء التنسيق والبنية لكنها لا تضمن جودة التصميم أو صحة كل شفرة HTML.
+5. لكل قسم قواعد وأوامر مختلفة؛ تعرض الواجهة البرنامج النصي والنتيجة في تبويبين. تتحقق المحللات من الحقول والأنواع والحدود والمراجع قبل تطبيق المخطط أو تصميم SVG أو تحرير المشروع. في استوديو التصميم، يستطيع Florence-2 تحليل الصور محليًا واستخراج وصف ومناطق أجسام ونصوص؛ وتُفحص لقطة SVG بعد التنفيذ، مع محاولتي تصحيح كحد أقصى لمشكلات حدود اللوحة أو تداخل النصوص. في OpenFilm، يتحقق المترجم أيضًا من تسلسل الصفحات وبنية HTML و`window.film.frame(t)` ومدد المشاهد واتصال الـTimeline قبل الحفظ. هذه الفحوص تقلل أخطاء التنسيق والبنية لكنها لا تضمن جودة التصميم أو صحة كل شفرة HTML.
 
-هذه خوارزمية ربط وتطبيع وتنفيذ خاصة بالمشروع، وليست نموذجًا جديدًا ولا ادعاءً بأن النموذج دُرّب محليًا. النموذج النصي لا يتحكم مباشرة بالمحرك؛ الطبقة تحوّل اللغة الطبيعية إلى واجهات وأوامر محدودة يفهمها المحرك.
+هذه خوارزمية ربط وتطبيع وتنفيذ خاصة بالمشروع، وليست نموذجًا عامًا جديدًا مدرّبًا. يستخدم استوديو التصميم نموذج Florence-2 مُدرّبًا مسبقًا للتحليل البصري المحلي، بينما يولّد المزوّد النصي المختار برنامج W2M؛ ثم يتحقق التطبيق منه وينفذه عبر موصل SVG المحدود.
 
 ### الخصوصية والبيانات
 
@@ -74,7 +74,7 @@ AI TaskFlow combines task and project management with configurable AI providers,
 
 On Windows 10/11, run the setup installer, then launch the app from its Start-menu or desktop shortcut. The installer includes portable Python, Node.js, and Bun runtimes, the backend/frontend/engine dependencies, and the required engine build files; installing the application does not require WinGet or dependency downloads. Run `start-all.bat` manually only when launching the project from its folder. Internet is needed for cloud AI providers or external content.
 
-To run a source checkout from Windows Command Prompt (CMD), launch `start-all.bat`. It checks dependencies and engines, asks before downloading missing packages, then selects available ports and prints the local access URL. Run `install-prerequisites.bat` to check/setup prerequisites without starting the services.
+To run a source checkout from Windows Command Prompt (CMD), launch `start-all.bat`. It rebuilds the current source, checks dependencies and enabled engines, asks before downloading missing runtimes or packages, selects available ports, waits for services to respond, and opens the ready local URL. Startup is cancelled if you decline a missing dependency required by an enabled engine. OpenFilm starts on demand when Motion Graphics is opened. Run `install-prerequisites.bat` to check/setup prerequisites without starting the services.
 
 ### Using the sections
 
@@ -82,10 +82,10 @@ To run a source checkout from Windows Command Prompt (CMD), launch `start-all.ba
 - **AI Providers:** add an OpenAI-compatible provider or Ollama, test it, and select it for chat and tools.
 - **AI Chat and Planner:** use workspace and document context to generate plans, tables, or sourced research. Review changes before applying them.
 - **Flowchart and Skills:** create visual workflows through the strict W2M/2 flowchart format, and save reusable instructions for later AI requests.
-- **Design Studio:** create or edit SVG logos through a coordinate- and layer-aware W2M/2 program, and search licensed image sources; review attribution and license terms before publishing.
+- **Design Studio:** create or edit SVG logos through a coordinate- and layer-aware W2M/2 program, and search licensed image sources. Florence-2 ONNX (up to 500 MB) can analyze reference/library images and verify the rendered result locally; text-only analysis may be sent to the selected provider to generate the program, not the images themselves. Florence-2, Whisper, and Piper downloads show the actual transferred, total, and remaining bytes.
 - **Architectural Plan:** generate a W2M/2 plan, edit it in the OpenCalque 2D editor, or convert it into a scene in AI TaskFlow 3D.
 - **Telegram delivery:** exportable results can be sent to a configured, linked bot; artifacts are not sent when the bot is unavailable.
-- **Motion Graphics:** create an OpenFilm project and edit its scenes and timeline in the embedded editor. W2M/2 is a versioned, grammar-based text language for project metadata and raw HTML blocks. Its compiler checks scene numbering, HTML/frame structure, declared durations, and sequential timeline references before saving, and can request AI repair when compilation fails. Three still frames may be sent from a video reference to the selected AI provider; the full video is not sent. Voiceover remains in the local project; FFmpeg analyzes it locally and only quiet-span timings are sent to the provider.
+- **Motion Graphics:** create an OpenFilm project and edit its scenes and timeline in the embedded editor. W2M/2 is a versioned, grammar-based text language for project metadata and raw HTML blocks. Its compiler checks scene numbering, HTML/frame structure, declared durations, and sequential timeline references before saving, and can request AI repair when compilation fails. Three frames are extracted and analyzed locally with Florence-2; the full video is never uploaded. If the selected provider does not accept images, only the local text descriptions are sent instead. Voiceover remains in the local project; FFmpeg analyzes it locally and only quiet-span timings are sent to the provider.
 - **Markdown and Help Center:** write documents, ask AI to revise them, and follow the in-app guides.
 
 ### Accounts, network access, and engines
@@ -104,9 +104,9 @@ The project's custom integration layer, created by **ADAM MAHMOUD ABDELALIM**, c
 2. It converts model output into the section-specific format: `taskflow-actions` for workspace/chat commands and W2M/2 for flowcharts, tables, design, architectural plans, and OpenFilm projects.
 3. It validates command types, fields, identifiers, limits, and data shape before execution; invalid output is rejected rather than sent as arbitrary text to an engine.
 4. The dispatcher applies approved actions to the workspace or sends scene geometry to an engine, then persists application state.
-5. Each section has its own versioned W2M/2 grammar and commands. The UI presents the program and resulting artifact in separate tabs. Parsers validate fields, types, limits, and references before applying a chart, SVG design, plan, or project. The OpenFilm compiler additionally validates scene order, HTML/frame structure, clip durations, and timeline continuity before saving. These structural checks reduce formatting errors but cannot guarantee visual quality or all runtime behavior.
+5. Each section has its own versioned W2M/2 grammar and commands. The UI presents the program and resulting artifact in separate tabs. Parsers validate fields, types, limits, and references before applying a chart, SVG design, plan, or project. In the Design Studio, Florence-2 can analyze images locally and inspect a rendered SVG screenshot; the adapter retries up to twice for detected canvas-boundary or text-overlap issues. The OpenFilm compiler additionally validates scene order, HTML/frame structure, clip durations, and timeline continuity before saving. These checks reduce structural errors but cannot guarantee visual quality or all runtime behavior.
 
-This is a project-specific command translation and execution algorithm, not a new trained model. The text model does not directly control an engine; the adapter translates natural language into a constrained interface the engine can process.
+This is a project-specific command translation and execution algorithm, not a newly trained general-purpose model. The Design Studio uses a pretrained local Florence-2 vision model; the selected text provider generates W2M, which the adapter validates and executes through the constrained SVG editor interface.
 
 ### Privacy and data
 
@@ -123,3 +123,5 @@ With PyInstaller and Inno Setup 6 installed, run:
 This creates `release\OPENFILM-AI TASKFLOW EDITION.exe` and the complete Inno Setup package under `installer\output`. The installer bundles project and engine dependencies, the 3D engine build, and portable Python/Node.js/Bun runtimes, so it is large but installs without WinGet or an internet connection. Users must accept the English or Arabic privacy agreement to continue. The EXE in `release` is a launcher for an installed project; use the setup installer rather than distributing the launcher alone.
 
 OpenCalque is MIT-licensed and included from `vendor/opencalque`; its license and other notices are retained in the vendor tree and `THIRD_PARTY_NOTICES.md`. OpenFilm is MIT-licensed; see `THIRD_PARTY_NOTICES.md`. The OpenFilm name and logo belong to their respective owners; this integration is not endorsed by the OpenFilm project.
+
+The dashboard shell integrates adapted React layout and sidebar components and design tokens from [shadcnstore/shadcn-dashboard-landing-template](https://github.com/shadcnstore/shadcn-dashboard-landing-template), pinned to commit `866423741fa4b62d5e9427603cb2174aedf00f80`. Existing TaskFlow routes, editors, state, authentication, and localization remain in place; template demo pages and assets are not included. See `THIRD_PARTY_NOTICES.md` for the source files and MIT license.

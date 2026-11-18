@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, LogOut, RefreshCw, Shield, X } from "lucide-react";
+import { Ban, Check, RefreshCw, Shield, ShieldOff, Trash2, X } from "lucide-react";
 import { API_BASE, apiFetch } from "./api";
 import { useAuth, type AuthStatus, type AuthUser } from "./authContext";
 import { translate, useLanguage } from "./localization";
@@ -39,7 +39,7 @@ async function fetchAdminAccounts(): Promise<AuthUser[]> {
 }
 
 export default function ServerAccessSettings() {
-  const { status, refreshStatus, logout } = useAuth();
+  const { status, refreshStatus } = useAuth();
   const language = useLanguage();
   const [settings, setSettings] = useState<Settings>(() => status ? settingsFromStatus(status) : {
     multi_user_enabled: false,
@@ -50,6 +50,7 @@ export default function ServerAccessSettings() {
     engine_openfilm_enabled: true,
   });
   const [accounts, setAccounts] = useState<AuthUser[]>([]);
+  const [blockNotes, setBlockNotes] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
 
@@ -111,6 +112,73 @@ export default function ServerAccessSettings() {
     }
   }
 
+  async function blockAccount(account: AuthUser) {
+    const note = blockNotes[account.id]?.trim() ?? "";
+    if (!note) {
+      setNotice(translate("اكتب ملاحظة توضح سبب الحظر.", language));
+      return;
+    }
+    setBusy(true);
+    setNotice("");
+    try {
+      const response = await apiFetch(`${API_BASE}/api/auth/admin/users/${encodeURIComponent(account.id)}/block`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note }),
+      });
+      if (!response.ok) {
+        const result = await response.json() as { detail?: string };
+        throw new Error(result.detail ?? `Request failed (${response.status}).`);
+      }
+      await loadAccounts();
+      setNotice(translate("تم حظر الحساب وإلغاء جلساته. ستظهر الملاحظة لصاحبه عند محاولة الدخول.", language));
+    } catch (reason) {
+      setNotice(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function unblockAccount(userId: string) {
+    setBusy(true);
+    setNotice("");
+    try {
+      const response = await apiFetch(`${API_BASE}/api/auth/admin/users/${encodeURIComponent(userId)}/unblock`, { method: "POST" });
+      if (!response.ok) {
+        const result = await response.json() as { detail?: string };
+        throw new Error(result.detail ?? `Request failed (${response.status}).`);
+      }
+      await loadAccounts();
+      setNotice(translate("تم إلغاء حظر الحساب. يجب على صاحبه تسجيل الدخول مجددًا.", language));
+    } catch (reason) {
+      setNotice(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteAccount(account: AuthUser) {
+    if (!window.confirm(translate(
+      "حذف الحساب نهائيًا مع بياناته ومزوّدي AI المرتبطين به. هل تريد المتابعة؟",
+      language,
+    ) + ` (${account.username})`)) return;
+    setBusy(true);
+    setNotice("");
+    try {
+      const response = await apiFetch(`${API_BASE}/api/auth/admin/users/${encodeURIComponent(account.id)}`, { method: "DELETE" });
+      if (!response.ok) {
+        const result = await response.json() as { detail?: string };
+        throw new Error(result.detail ?? `Request failed (${response.status}).`);
+      }
+      await loadAccounts();
+      setNotice(translate("تم حذف الحساب وبياناته.", language));
+    } catch (reason) {
+      setNotice(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const restartRequired = Boolean(status && (
     status.local_only !== settings.local_only ||
     status.engine_2d_enabled !== settings.engine_2d_enabled ||
@@ -147,15 +215,38 @@ export default function ServerAccessSettings() {
       <div className="server-user-list">
         {accounts.map((account) => (
           <div className="server-user-row" key={account.id}>
-            <span><strong>{account.username}</strong><small>{translate(account.role === "admin" ? "مسؤول الجهاز" : "مستخدم", language)} · {translate(account.status === "pending" ? "بانتظار الموافقة" : account.status === "approved" ? "مفعّل" : "مرفوض", language)}</small></span>
-            {account.status === "pending" && <div>
-              <button type="button" aria-label="Approve account" title={translate("موافقة", language)} disabled={busy} onClick={() => void changeAccount(account.id, "approve")}><Check size={16} /></button>
-              <button type="button" aria-label="Reject account" title={translate("رفض", language)} disabled={busy} onClick={() => void changeAccount(account.id, "reject")}><X size={16} /></button>
-            </div>}
+            <span>
+              <strong>{account.username}</strong>
+              <small>{translate(account.role === "admin" ? "مسؤول الجهاز" : "مستخدم", language)} · {account.is_blocked
+                ? translate("محظور", language)
+                : translate(account.status === "pending" ? "بانتظار الموافقة" : account.status === "approved" ? "مفعّل" : "مرفوض", language)}</small>
+              {account.is_blocked && account.block_note && <small className="server-user-note">{translate("ملاحظة الحظر:", language)} {account.block_note}</small>}
+              {account.role !== "admin" && <label className="server-user-block-note">
+                <span>{translate("ملاحظة الحظر", language)}</span>
+                <textarea
+                  value={blockNotes[account.id] ?? account.block_note ?? ""}
+                  onChange={(event) => setBlockNotes({ ...blockNotes, [account.id]: event.target.value })}
+                  maxLength={500}
+                  rows={2}
+                  placeholder={translate("اكتب سبب الحظر ليظهر للمستخدم عند تسجيل الدخول", language)}
+                />
+              </label>}
+            </span>
+            <div className="server-user-actions">
+              {account.status === "pending" && !account.is_blocked && <>
+                <button type="button" aria-label={translate("موافقة", language)} title={translate("موافقة", language)} disabled={busy} onClick={() => void changeAccount(account.id, "approve")}><Check size={16} /></button>
+                <button type="button" aria-label={translate("رفض", language)} title={translate("رفض", language)} disabled={busy} onClick={() => void changeAccount(account.id, "reject")}><X size={16} /></button>
+              </>}
+              {account.role !== "admin" && <>
+                {account.is_blocked
+                  ? <button type="button" aria-label={translate("إلغاء الحظر", language)} title={translate("إلغاء الحظر", language)} disabled={busy} onClick={() => void unblockAccount(account.id)}><ShieldOff size={16} /></button>
+                  : <button type="button" aria-label={translate("حظر الحساب", language)} title={translate("حظر الحساب", language)} disabled={busy || !(blockNotes[account.id]?.trim() || account.block_note?.trim())} onClick={() => void blockAccount(account)}><Ban size={16} /></button>}
+                <button type="button" aria-label={translate("حذف الحساب", language)} title={translate("حذف الحساب", language)} disabled={busy} onClick={() => void deleteAccount(account)}><Trash2 size={16} /></button>
+              </>}
+            </div>
           </div>
         ))}
       </div>
-      <button className="server-logout" type="button" onClick={() => void logout()}><LogOut size={15} />{translate("تسجيل الخروج", language)}</button>
     </section>
   );
 }

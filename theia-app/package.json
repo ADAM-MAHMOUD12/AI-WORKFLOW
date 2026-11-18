@@ -1,0 +1,97 @@
+{
+  "name": "ai-taskflow-theia",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "productName": "AI TASKFLOW CODE (TF CODE)",
+  "description": "AI TASKFLOW CODE (TF CODE) browser IDE built with Eclipse Theia",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
+  "theia": {
+    "target": "browser",
+    "frontend": {
+      "config": {
+        "applicationName": "AI TASKFLOW CODE (TF CODE)",
+        "warnOnPotentiallyInsecureHostPattern": false,
+        "preferences": {
+          "toolbar.showToolbar": true,
+          "files.enableTrash": true,
+          "security.workspace.trust.enabled": true,
+          "ai-features.AiEnable.enableAI": true
+        },
+        "reloadOnReconnect": true
+      }
+    },
+    "backend": {
+      "config": {
+        "warnOnPotentiallyInsecureHostPattern": false,
+        "startupTimeout": -1,
+        "resolveSystemPlugins": false,
+        "configurationFolder": ".taskflow-theia",
+        "frontendConnectionTimeout": 30000
+      }
+    }
+  },
+  "scripts": {
+    "build": "theia rebuild:browser --cacheRoot .. && theia build --app-target=browser --mode development",
+    "start": "theia start"
+  },
+  "dependencies": {
+    "@theia/ai-chat": "1.77.0",
+    "@theia/ai-chat-ui": "1.77.0",
+    "@theia/ai-core": "1.77.0",
+    "@theia/ai-core-ui": "1.77.0",
+    "@theia/ai-editor": "1.77.0",
+    "@theia/ai-ide": "1.77.0",
+    "@theia/ai-openai": "1.77.0",
+    "@theia/ai-ollama": "1.77.0",
+    "@theia/ai-terminal": "1.77.0",
+    "@theia/bulk-edit": "1.77.0",
+    "@theia/callhierarchy": "1.77.0",
+    "@theia/console": "1.77.0",
+    "@theia/core": "1.77.0",
+    "@theia/debug": "1.77.0",
+    "@theia/editor": "1.77.0",
+    "@theia/editor-preview": "1.77.0",
+    "@theia/external-terminal": "1.77.0",
+    "@theia/file-search": "1.77.0",
+    "@theia/filesystem": "1.77.0",
+    "@theia/keymaps": "1.77.0",
+    "@theia/markers": "1.77.0",
+    "@theia/messages": "1.77.0",
+    "@theia/mini-browser": "1.77.0",
+    "@theia/monaco": "1.77.0",
+    "@theia/navigator": "1.77.0",
+    "@theia/notebook": "1.77.0",
+    "@theia/outline-view": "1.77.0",
+    "@theia/output": "1.77.0",
+    "@theia/plugin-ext": "1.77.0",
+    "@theia/plugin-ext-vscode": "1.77.0",
+    "@theia/preferences": "1.77.0",
+    "@theia/process": "1.77.0",
+    "@theia/scm": "1.77.0",
+    "@theia/search-in-workspace": "1.77.0",
+    "@theia/task": "1.77.0",
+    "@theia/terminal": "1.77.0",
+    "@theia/terminal-manager": "1.77.0",
+    "@theia/timeline": "1.77.0",
+    "@theia/toolbar": "1.77.0",
+    "@theia/userstorage": "1.77.0",
+    "@theia/vsx-registry": "1.77.0",
+    "@theia/workspace": "1.77.0",
+    "@taskflow/theia-ai": "file:extensions/taskflow-ai",
+    "@parcel/watcher-win32-x64": "2.6.0",
+    "@vscode/ripgrep-win32-x64": "1.18.0",
+    "@vscode/windows-ca-certs": "0.3.4",
+    "trash": "7.2.0",
+    "reflect-metadata": "^0.2.2"
+  },
+  "devDependencies": {
+    "@theia/bundle-plugin": "1.77.0",
+    "@theia/cli": "1.77.0",
+    "esbuild-plugins-node-modules-polyfill": "^1.8.3",
+    "esbuild-plugin-copy": "^2.1.1"
+  }
+}

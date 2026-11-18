@@ -18,6 +18,7 @@ import ipaddress
 import io
 import wave
 import threading
+import zipfile
 from functools import lru_cache
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
@@ -33,7 +34,7 @@ import httpx
 from av.error import FFmpegError
 from cryptography.fernet import Fernet, InvalidToken
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, ValidationError, field_validator, model_validator
 from starlette.background import BackgroundTask
@@ -44,11 +45,85 @@ from starlette.responses import JSONResponse, Response
 load_dotenv()
 
 from database import USING_POSTGRES, db_connection, initialize_database
+from download_progress import advance_download, begin_download, download_status, finish_download, huggingface_tqdm_class
+from local_vision import (
+    MODEL_DOWNLOAD_LOCK as LOCAL_VISION_DOWNLOAD_LOCK,
+    MODEL_DOWNLOAD_ID as LOCAL_VISION_DOWNLOAD_ID,
+    analyze_image as analyze_local_image,
+    download_model as download_local_vision_model,
+    model_status as local_vision_model_status,
+)
+from provider_errors import provider_http_error
+from skill_marketplace import (
+    fetch_skill as fetch_public_skill,
+    popular_skills as list_public_popular_skills,
+    search_skills as search_public_skills,
+)
+from programming_workspace import (
+    clone_github_repository_workspace,
+    git_commit_staged_changes,
+    git_push_repository,
+    git_repository_status,
+    git_stage_repository_files,
+    initialize_project_workspace,
+    read_project_workspace,
+    run_project_command,
+    write_project_workspace,
+)
 
 APP_NAME = "AI TaskFlow Backend"
 ENVIRONMENT = os.getenv("TASKFLOW_ENV", "development").lower()
 DATABASE_PATH = Path(os.getenv("TASKFLOW_DATABASE", "./data/taskflow.db"))
 DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
+PROGRAMMING_EXTENSIONS_ROOT = Path(__file__).resolve().parent / "data" / "programming-extensions"
+MAX_PROGRAMMING_EXTENSION_BYTES = 50 * 1024 * 1024
+THEME_STORE_REPOSITORY_URL = "https://github.com/ADAM-MAHMOUD12/AI-TASKFLOW-CODE-THEMES-EXTENSIONS.git"
+MAX_THEME_FILE_BYTES = 128 * 1024
+MAX_THEME_README_BYTES = 50_000
+MAX_THEME_PREVIEW_BYTES = 5 * 1024 * 1024
+THEME_COLOR_KEYS = {
+    "editorBackground", "editorLineNumberForeground", "editorCursorForeground",
+    "editorSelectionBackground", "editorLineHighlightBackground", "editorWhitespaceForeground",
+    "sidebarBackground", "sidebarForeground", "activityBarBackground", "activityBarForeground",
+    "tabBarBackground", "tabActiveBackground", "tabActiveForeground",
+    "tabInactiveBackground", "tabInactiveForeground", "panelBackground",
+    "statusBarBackground", "statusBarForeground", "foreground", "accent", "focusBorder",
+    "inputBackground", "inputForeground", "buttonBackground", "buttonForeground",
+    "buttonHoverBackground", "listHoverBackground", "listActiveSelectionBackground",
+    "listActiveSelectionForeground", "toolbarHoverBackground", "tabHoverBackground",
+}
+THEME_SIZE_LIMITS = {
+    "uiFontSize": (11, 18),
+    "editorFontSize": (10, 24),
+    "cornerRadius": (0, 18),
+}
+THEME_FONT_OPTIONS = {
+    "ui": {"system", "inter", "cairo", "segoe", "arial"},
+    "editor": {"monospace", "cascadia-code", "jetbrains-mono", "fira-code", "consolas"},
+}
+THEME_GLASS_LIMITS = {
+    "blur": (0, 36),
+    "opacity": (10, 92),
+    "saturation": (60, 180),
+}
+THEME_BUTTON_LIMITS = {
+    "radius": (0, 24),
+    "height": (28, 52),
+}
+THEME_MOTION_LIMITS = {
+    "duration": (80, 500),
+    "hoverLift": (0, 4),
+}
+THEME_BUTTON_STYLES = {"solid", "soft", "outline", "glass"}
+THEME_MOTION_PRESETS = {"none", "subtle", "smooth", "snappy"}
+THEME_SETTING_CONTROLS = {
+    "glassEffect", "glassBlur", "glassOpacity", "glassSaturation", "glassTint", "glassWallpaper",
+    "uiFontFamily", "editorFontFamily", "uiFontSize", "editorFontSize",
+    "cornerRadius", "accent", "buttonHoverBackground", "listHoverBackground",
+    "listActiveSelectionBackground", "listActiveSelectionForeground",
+    "toolbarHoverBackground", "tabHoverBackground", "focusBorder", "buttonRadius",
+    "buttonHeight", "buttonStyle", "motionPreset", "motionDuration", "hoverLift",
+}
 
 raw_key = os.getenv("TASKFLOW_ENCRYPTION_KEY", "").strip()
 if not raw_key or raw_key == "PASTE_GENERATED_FERNET_KEY_HERE":
@@ -62,6 +137,14 @@ except Exception as exc:
     raise RuntimeError("TASKFLOW_ENCRYPTION_KEY is invalid.") from exc
 
 API_TOKEN = os.getenv("TASKFLOW_API_TOKEN", "").strip()
+GITHUB_OAUTH_CLIENT_ID = os.getenv("TASKFLOW_GITHUB_CLIENT_ID", "").strip()
+GITHUB_OAUTH_SCOPE_LOGIN = "read:user"
+GITHUB_OAUTH_SCOPE_LINK = "repo read:user"
+GITHUB_OAUTH_DEVICE_URL = "https://github.com/login/device/code"
+GITHUB_OAUTH_TOKEN_URL = "https://github.com/login/oauth/access_token"
+GITHUB_API_USER_URL = "https://api.github.com/user"
+GITHUB_API_BASE_URL = "https://api.github.com"
+GITHUB_OAUTH_FLOW_LIFETIME = timedelta(minutes=15)
 try:
     API_PORT = int(os.getenv("TASKFLOW_API_PORT", "8000"))
 except ValueError as exc:
@@ -154,6 +237,61 @@ class SpeechTranscriptionResponse(BaseModel):
     duration: float | None = None
 
 
+class W2MVisionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    image: str = Field(min_length=30, max_length=5_600_000)
+    mode: Literal["full", "caption"] = "full"
+
+
+class ProgrammingFile(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    path: str = Field(min_length=1, max_length=240)
+    content: str = Field(max_length=1_000_000)
+
+
+class ProgrammingRunRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    project_id: str = Field(min_length=32, max_length=32)
+    shell: Literal["cmd", "powershell"]
+    command: str = Field(min_length=1, max_length=2_000)
+    files: list[ProgrammingFile] = Field(default_factory=list, max_length=60)
+
+
+class ProgrammingWorkspaceRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    project_id: str = Field(min_length=32, max_length=32)
+    files: list[ProgrammingFile] = Field(default_factory=list, max_length=60)
+
+
+class GitHubRepositoryCloneRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    project_id: str = Field(pattern=r"^[a-f0-9]{32}$")
+    full_name: str = Field(min_length=3, max_length=200, pattern=r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+
+    @field_validator("full_name")
+    @classmethod
+    def validate_repository_parts(cls, value: str) -> str:
+        if any(part in {"", ".", ".."} for part in value.split("/")):
+            raise ValueError("Invalid GitHub repository name.")
+        return value
+
+
+class GitRepositoryFilesRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    project_id: str = Field(pattern=r"^[a-f0-9]{32}$")
+    paths: list[str] = Field(min_length=1, max_length=200)
+    stage: bool
+
+
+class GitCommitRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    project_id: str = Field(pattern=r"^[a-f0-9]{32}$")
+    title: str = Field(min_length=1, max_length=200)
+    description: str = Field(default="", max_length=5000)
+    author_name: str = Field(min_length=1, max_length=100)
+    author_email: str = Field(min_length=3, max_length=254)
+
+
 class SearchRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     provider_id: str
@@ -170,6 +308,14 @@ class AccountCredentials(BaseModel):
     username: str = Field(min_length=3, max_length=32)
     password: SecretStr = Field(min_length=12, max_length=256)
 
+class GithubDeviceFlowStart(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    mode: Literal["login", "link"]
+
+class GithubDeviceFlowPoll(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    flow_id: str = Field(min_length=32, max_length=128)
+
 class AuthSettingsUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     multi_user_enabled: bool
@@ -184,7 +330,21 @@ class UserPublic(BaseModel):
     username: str
     role: Literal["admin", "user"]
     status: Literal["approved", "pending", "rejected"]
+    is_blocked: bool = False
+    block_note: str = ""
     created_at: str
+
+class AccountBlockRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    note: str = Field(min_length=1, max_length=500)
+
+    @field_validator("note")
+    @classmethod
+    def validate_note(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("A note is required when blocking an account.")
+        return normalized
 
 class ChatResponse(BaseModel):
     provider_id: str
@@ -281,11 +441,6 @@ def strip_internal_reasoning(value: str) -> str:
     value = re.sub(r"</?(?:thought|think|analysis|reasoning)>", "", value, flags=re.IGNORECASE)
     return value.strip()
 
-class TerminalRunRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    command: Literal["build", "lint"]
-
-
 class OpenFilmSceneSource(BaseModel):
     model_config = ConfigDict(extra="forbid")
     file: str = Field(pattern=r"^scene-[0-9]{2}\.html$")
@@ -353,7 +508,10 @@ class OpenFilmImageParser(HTMLParser):
             })
 PASSWORD_HASH_ITERATIONS = 600_000
 SESSION_LIFETIME = timedelta(days=30)
-PUBLIC_AUTH_PATHS = {"/api/auth/status", "/api/auth/register", "/api/auth/login"}
+PUBLIC_AUTH_PATHS = {
+    "/api/auth/status", "/api/auth/register", "/api/auth/login",
+    "/api/auth/github/device/start", "/api/auth/github/device/poll",
+}
 PUBLIC_API_PATHS = {"/api/images/embed", "/api/images/search"}
 
 
@@ -420,7 +578,7 @@ def session_user(token: str | None, allow_pending: bool = False) -> dict[str, An
         return None
     with db_connection() as db:
         row = db.execute(
-            "SELECT u.id, u.username, u.role, u.status, u.created_at, s.expires_at "
+            "SELECT u.id, u.username, u.role, u.status, u.is_blocked, u.block_note, u.created_at, s.expires_at "
             "FROM auth_sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?",
             (session_token_hash(token),),
         ).fetchone()
@@ -434,10 +592,11 @@ def session_user(token: str | None, allow_pending: bool = False) -> dict[str, An
             return None
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
-    if expires_at <= datetime.now(timezone.utc) or (row["status"] != "approved" and not allow_pending):
+    if expires_at <= datetime.now(timezone.utc) or row["is_blocked"] or (row["status"] != "approved" and not allow_pending):
         return None
     return {"id": row["id"], "username": row["username"], "role": row["role"],
-            "status": row["status"], "created_at": str(row["created_at"])}
+            "status": row["status"], "created_at": str(row["created_at"]),
+            "is_blocked": bool(row["is_blocked"]), "block_note": row["block_note"]}
 
 
 def require_api_token(request: Request, authorization: str | None = Header(default=None)) -> dict[str, Any] | None:
@@ -589,9 +748,10 @@ async def provider_request(
                 status_code=422,
                 detail="رفض النموذج الصورة. جرّب نموذجًا يدعم تحليل الصور.",
             ) from exc
+        status_code, detail = provider_http_error(exc.response.status_code, row["name"])
         raise HTTPException(
-            status_code=502,
-            detail=f"AI provider returned HTTP {exc.response.status_code}. Check provider URL, key and model.",
+            status_code=status_code,
+            detail=detail,
         ) from exc
     except (httpx.HTTPError, ValueError) as exc:
         raise HTTPException(
@@ -1344,11 +1504,15 @@ async def telegram_poll_user(user_id: str) -> None:
         raise
 
 
-async def restart_telegram_bot(user_id: str) -> None:
+async def stop_telegram_bot(user_id: str) -> None:
     previous = telegram_bot_tasks.pop(user_id, None)
     if previous:
         previous.cancel()
         await asyncio.gather(previous, return_exceptions=True)
+
+
+async def restart_telegram_bot(user_id: str) -> None:
+    await stop_telegram_bot(user_id)
     config = telegram_bot_row(user_id)
     if config and config["enabled"]:
         telegram_bot_tasks[user_id] = asyncio.create_task(telegram_poll_user(user_id))
@@ -1427,6 +1591,8 @@ def public_user(row: Any) -> dict[str, Any]:
         "username": row["username"],
         "role": row["role"],
         "status": row["status"],
+        "is_blocked": bool(row["is_blocked"]) if "is_blocked" in row.keys() else False,
+        "block_note": row["block_note"] if "block_note" in row.keys() else "",
         "created_at": str(row["created_at"]),
     }
 
@@ -1441,6 +1607,129 @@ def create_auth_session(db: Any, user_id: str) -> str:
     return token
 
 
+github_oauth_poll_locks: dict[str, asyncio.Lock] = {}
+
+
+def github_flow_time(value: Any) -> datetime:
+    if isinstance(value, datetime):
+        parsed = value
+    elif isinstance(value, str):
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    else:
+        raise HTTPException(status_code=500, detail="Invalid GitHub authorization flow timestamp.")
+    return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed
+
+
+def create_github_username(login: str, db: Any) -> str:
+    base = re.sub(r"[^a-z0-9_.-]", "-", login.casefold()).strip("._-")
+    base = base[:24] if len(base) >= 3 else "github-user"
+    candidate = base
+    while db.execute("SELECT 1 FROM users WHERE username = ?", (candidate,)).fetchone():
+        candidate = f"{base[:23]}-{secrets.token_hex(2)}"
+    return candidate
+
+
+def finish_github_authorization(
+    flow: Any,
+    github_user_id: str,
+    github_login: str,
+    access_token: str,
+    scopes: str,
+) -> dict[str, Any]:
+    now = datetime.now(timezone.utc)
+    with db_connection() as db:
+        if flow["mode"] == "link":
+            user_id = flow["user_id"]
+            if not user_id:
+                raise HTTPException(status_code=400, detail="This GitHub link flow has no TaskFlow account.")
+            identity = db.execute(
+                "SELECT user_id FROM github_accounts WHERE github_user_id = ?", (github_user_id,)
+            ).fetchone()
+            if identity and identity["user_id"] != user_id:
+                raise HTTPException(status_code=409, detail="This GitHub account is already linked to another TaskFlow account.")
+            current_link = db.execute(
+                "SELECT github_user_id FROM github_accounts WHERE user_id = ?", (user_id,)
+            ).fetchone()
+            if current_link and current_link["github_user_id"] != github_user_id:
+                raise HTTPException(status_code=409, detail="A different GitHub account is already linked to this TaskFlow account.")
+            if current_link:
+                db.execute(
+                    "UPDATE github_accounts SET github_login = ?, encrypted_access_token = ?, scopes = ?, updated_at = ? "
+                    "WHERE user_id = ?",
+                    (github_login, encrypt_secret(access_token), scopes, now, user_id),
+                )
+            else:
+                db.execute(
+                    "INSERT INTO github_accounts (user_id, github_user_id, github_login, encrypted_access_token, scopes) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    (user_id, github_user_id, github_login, encrypt_secret(access_token), scopes),
+                )
+            return {"status": "connected", "github_login": github_login}
+
+        linked_account = db.execute(
+            "SELECT u.id, u.username, u.role, u.status, u.is_blocked, u.block_note, u.created_at "
+            "FROM github_accounts g JOIN users u ON u.id = g.user_id WHERE g.github_user_id = ?",
+            (github_user_id,),
+        ).fetchone()
+        if linked_account:
+            if linked_account["is_blocked"]:
+                note = linked_account["block_note"].strip()
+                detail = "This account is blocked."
+                if note:
+                    detail = f"{detail} Reason: {note}"
+                raise HTTPException(status_code=403, detail=detail)
+            if linked_account["status"] == "pending":
+                return {"status": "pending_approval", "user": public_user(linked_account)}
+            if linked_account["status"] != "approved":
+                raise HTTPException(status_code=403, detail="This TaskFlow account is not approved.")
+            token = create_auth_session(db, linked_account["id"])
+            return {
+                "status": "authenticated",
+                "user": public_user(linked_account),
+                "access_token": token,
+                "token_type": "bearer",
+            }
+
+        settings = auth_settings()
+        if USING_POSTGRES:
+            db.execute("LOCK TABLE users IN EXCLUSIVE MODE")
+        else:
+            db.execute("UPDATE auth_settings SET value = value WHERE key = 'multi_user_enabled'")
+        account_count = db.execute("SELECT COUNT(*) AS count FROM users").fetchone()["count"]
+        if account_count > 0 and not settings["multi_user_enabled"]:
+            raise HTTPException(
+                status_code=403,
+                detail="Sign in to your existing TaskFlow account first, then link GitHub from TF CODE.",
+            )
+        user_id = str(uuid.uuid4())
+        status = "approved" if account_count == 0 or not settings["approval_required"] else "pending"
+        role = "admin" if account_count == 0 else "user"
+        username = create_github_username(github_login, db)
+        db.execute(
+            "INSERT INTO users (id, username, password_hash, role, status) VALUES (?, ?, ?, ?, ?)",
+            (user_id, username, password_digest(secrets.token_urlsafe(48)), role, status),
+        )
+        db.execute(
+            "INSERT INTO github_accounts (user_id, github_user_id, github_login, encrypted_access_token, scopes) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (user_id, github_user_id, github_login, encrypt_secret(access_token), scopes),
+        )
+        if account_count == 0:
+            db.execute("UPDATE auth_settings SET value = '1' WHERE key = 'multi_user_enabled'")
+        user = db.execute(
+            "SELECT id, username, role, status, created_at FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+        if status != "approved":
+            return {"status": "pending_approval", "user": public_user(user)}
+        token = create_auth_session(db, user_id)
+        return {
+            "status": "authenticated",
+            "user": public_user(user),
+            "access_token": token,
+            "token_type": "bearer",
+        }
+
+
 @app.get("/api/auth/status")
 async def auth_status():
     settings = auth_settings()
@@ -1450,6 +1739,7 @@ async def auth_status():
         **settings,
         "account_count": row["count"],
         "registration_open": settings["multi_user_enabled"] or row["count"] == 0,
+        "github_oauth_enabled": bool(GITHUB_OAUTH_CLIENT_ID),
     }
 
 
@@ -1499,6 +1789,12 @@ async def login(payload: AccountCredentials):
         row = db.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
         if row is None or not verify_password(payload.password.get_secret_value(), row["password_hash"]):
             raise HTTPException(status_code=401, detail="Incorrect username or password.")
+        if row["is_blocked"]:
+            note = row["block_note"].strip()
+            detail = "This account is blocked."
+            if note:
+                detail = f"{detail} Reason: {note}"
+            raise HTTPException(status_code=403, detail=detail)
         if row["status"] == "pending":
             raise HTTPException(status_code=403, detail="Account approval is pending.")
         if row["status"] != "approved":
@@ -1506,6 +1802,439 @@ async def login(payload: AccountCredentials):
         token = create_auth_session(db, row["id"])
         user = public_user(row)
     return {"user": user, "access_token": token, "token_type": "bearer"}
+
+
+@app.post("/api/auth/github/device/start")
+async def start_github_device_flow(
+    payload: GithubDeviceFlowStart,
+    authorization: str | None = Header(default=None),
+):
+    if not GITHUB_OAUTH_CLIENT_ID:
+        raise HTTPException(status_code=503, detail="GitHub sign-in is not configured on this TaskFlow host.")
+    user = session_user(bearer_token(authorization)) if payload.mode == "link" else None
+    if payload.mode == "link" and user is None:
+        raise HTTPException(status_code=401, detail="Sign in to TaskFlow before linking GitHub.")
+    scopes = GITHUB_OAUTH_SCOPE_LINK if payload.mode == "link" else GITHUB_OAUTH_SCOPE_LOGIN
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            response = await client.post(
+                GITHUB_OAUTH_DEVICE_URL,
+                data={"client_id": GITHUB_OAUTH_CLIENT_ID, "scope": scopes},
+                headers={"Accept": "application/json"},
+            )
+    except httpx.TimeoutException as exc:
+        raise HTTPException(status_code=504, detail="GitHub did not respond in time. Try again.") from exc
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail="Could not reach GitHub to start sign-in.") from exc
+    if not response.is_success:
+        raise HTTPException(status_code=502, detail="GitHub rejected the device authorization request.")
+    try:
+        result = response.json()
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail="GitHub returned an invalid device authorization response.") from exc
+    if not isinstance(result, dict):
+        raise HTTPException(status_code=502, detail="GitHub returned an invalid device authorization response.")
+    device_code = result.get("device_code")
+    user_code = result.get("user_code")
+    verification_uri = result.get("verification_uri")
+    expires_in = result.get("expires_in")
+    interval = result.get("interval", 5)
+    if (not isinstance(device_code, str) or not device_code or
+            not isinstance(user_code, str) or not user_code or
+            not isinstance(verification_uri, str) or
+            not isinstance(expires_in, int) or not 60 <= expires_in <= 1800 or
+            not isinstance(interval, int) or not 1 <= interval <= 30):
+        raise HTTPException(status_code=502, detail="GitHub returned incomplete device authorization details.")
+    verification = urlparse(verification_uri)
+    if verification.scheme != "https" or verification.hostname != "github.com":
+        raise HTTPException(status_code=502, detail="GitHub returned an untrusted verification URL.")
+    flow_id = secrets.token_urlsafe(32)
+    now = datetime.now(timezone.utc)
+    with db_connection() as db:
+        expired_flows = db.execute(
+            "SELECT flow_token_hash FROM github_oauth_flows WHERE expires_at <= ?", (now,)
+        ).fetchall()
+        db.execute("DELETE FROM github_oauth_flows WHERE expires_at <= ?", (now,))
+    for expired_flow in expired_flows:
+        github_oauth_poll_locks.pop(expired_flow["flow_token_hash"], None)
+    with db_connection() as db:
+        db.execute(
+            "INSERT INTO github_oauth_flows "
+            "(flow_token_hash, mode, user_id, encrypted_device_code, interval_seconds, expires_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (session_token_hash(flow_id), payload.mode, user["id"] if user else None,
+             encrypt_secret(device_code), interval, now + timedelta(seconds=expires_in)),
+        )
+    response_payload = {
+        "flow_id": flow_id,
+        "user_code": user_code,
+        "verification_uri": verification_uri,
+        "interval": interval,
+        "expires_in": expires_in,
+        "mode": payload.mode,
+    }
+    verification_uri_complete = result.get("verification_uri_complete")
+    if isinstance(verification_uri_complete, str):
+        complete_url = urlparse(verification_uri_complete)
+        if complete_url.scheme == "https" and complete_url.hostname == "github.com":
+            response_payload["verification_uri_complete"] = verification_uri_complete
+    return response_payload
+
+
+@app.post("/api/auth/github/device/poll")
+async def poll_github_device_flow(
+    payload: GithubDeviceFlowPoll,
+    authorization: str | None = Header(default=None),
+):
+    flow_hash = session_token_hash(payload.flow_id)
+    lock = github_oauth_poll_locks.setdefault(flow_hash, asyncio.Lock())
+    async with lock:
+        with db_connection() as db:
+            flow = db.execute(
+                "SELECT * FROM github_oauth_flows WHERE flow_token_hash = ?", (flow_hash,)
+            ).fetchone()
+        if flow is None:
+            raise HTTPException(status_code=404, detail="GitHub sign-in has expired or was already completed.")
+        if github_flow_time(flow["expires_at"]) <= datetime.now(timezone.utc):
+            with db_connection() as db:
+                db.execute("DELETE FROM github_oauth_flows WHERE flow_token_hash = ?", (flow_hash,))
+            github_oauth_poll_locks.pop(flow_hash, None)
+            raise HTTPException(status_code=410, detail="GitHub sign-in expired. Start again.")
+        if flow["mode"] == "link":
+            user = session_user(bearer_token(authorization))
+            if user is None or user["id"] != flow["user_id"]:
+                raise HTTPException(status_code=401, detail="The TaskFlow account that started this link is no longer signed in.")
+
+        now = datetime.now(timezone.utc)
+        last_polled = flow["last_polled_at"]
+        if last_polled:
+            next_poll = github_flow_time(last_polled) + timedelta(seconds=flow["interval_seconds"])
+            if now < next_poll:
+                return {"status": "pending", "retry_after": max(1, int((next_poll - now).total_seconds()))}
+        with db_connection() as db:
+            db.execute(
+                "UPDATE github_oauth_flows SET last_polled_at = ? WHERE flow_token_hash = ?",
+                (now, flow_hash),
+            )
+        try:
+            device_code = FERNET.decrypt(flow["encrypted_device_code"].encode()).decode()
+        except (InvalidToken, UnicodeDecodeError) as exc:
+            raise HTTPException(status_code=500, detail="Could not read the pending GitHub authorization securely.") from exc
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                token_response = await client.post(
+                    GITHUB_OAUTH_TOKEN_URL,
+                    data={
+                        "client_id": GITHUB_OAUTH_CLIENT_ID,
+                        "device_code": device_code,
+                        "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+                    },
+                    headers={"Accept": "application/json"},
+                )
+        except httpx.TimeoutException as exc:
+            raise HTTPException(status_code=504, detail="GitHub did not respond while checking authorization.") from exc
+        except httpx.RequestError as exc:
+            raise HTTPException(status_code=502, detail="Could not reach GitHub while checking authorization.") from exc
+        if not token_response.is_success:
+            raise HTTPException(status_code=502, detail="GitHub rejected the authorization check.")
+        try:
+            token_result = token_response.json()
+        except ValueError as exc:
+            raise HTTPException(status_code=502, detail="GitHub returned an invalid authorization response.") from exc
+        if not isinstance(token_result, dict):
+            raise HTTPException(status_code=502, detail="GitHub returned an invalid authorization response.")
+        oauth_error = token_result.get("error")
+        if oauth_error == "authorization_pending":
+            return {"status": "pending", "retry_after": flow["interval_seconds"]}
+        if oauth_error == "slow_down":
+            with db_connection() as db:
+                db.execute(
+                    "UPDATE github_oauth_flows SET interval_seconds = interval_seconds + 5 "
+                    "WHERE flow_token_hash = ?",
+                    (flow_hash,),
+                )
+            return {"status": "pending", "retry_after": flow["interval_seconds"] + 5}
+        if oauth_error == "expired_token":
+            with db_connection() as db:
+                db.execute("DELETE FROM github_oauth_flows WHERE flow_token_hash = ?", (flow_hash,))
+            github_oauth_poll_locks.pop(flow_hash, None)
+            raise HTTPException(status_code=410, detail="GitHub sign-in expired. Start again.")
+        if oauth_error == "access_denied":
+            with db_connection() as db:
+                db.execute("DELETE FROM github_oauth_flows WHERE flow_token_hash = ?", (flow_hash,))
+            github_oauth_poll_locks.pop(flow_hash, None)
+            raise HTTPException(status_code=403, detail="GitHub authorization was declined.")
+        access_token = token_result.get("access_token")
+        if not isinstance(access_token, str) or not access_token:
+            raise HTTPException(status_code=502, detail="GitHub did not return an access token.")
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                profile_response = await client.get(
+                    GITHUB_API_USER_URL,
+                    headers={
+                        "Accept": "application/vnd.github+json",
+                        "Authorization": f"Bearer {access_token}",
+                        "X-GitHub-Api-Version": "2022-11-28",
+                    },
+                )
+        except httpx.TimeoutException as exc:
+            raise HTTPException(status_code=504, detail="GitHub did not respond while loading the account.") from exc
+        except httpx.RequestError as exc:
+            raise HTTPException(status_code=502, detail="Could not load the GitHub account profile.") from exc
+        if not profile_response.is_success:
+            raise HTTPException(status_code=502, detail="GitHub did not accept the newly issued access token.")
+        try:
+            profile = profile_response.json()
+        except ValueError as exc:
+            raise HTTPException(status_code=502, detail="GitHub returned an invalid account profile.") from exc
+        if (not isinstance(profile, dict) or not isinstance(profile.get("id"), int) or
+                not isinstance(profile.get("login"), str) or not profile["login"]):
+            raise HTTPException(status_code=502, detail="GitHub returned an incomplete account profile.")
+        with db_connection() as db:
+            db.execute("DELETE FROM github_oauth_flows WHERE flow_token_hash = ?", (flow_hash,))
+        github_oauth_poll_locks.pop(flow_hash, None)
+        scopes = token_result.get("scope")
+        if not isinstance(scopes, str):
+            scopes = profile_response.headers.get("X-OAuth-Scopes", "")
+        return finish_github_authorization(
+            flow,
+            str(profile["id"]),
+            profile["login"],
+            access_token,
+            scopes,
+        )
+
+
+@app.get("/api/github/account")
+async def github_account(user: dict[str, Any] = Depends(require_session)):
+    with db_connection() as db:
+        row = db.execute(
+            "SELECT github_login, scopes, updated_at FROM github_accounts WHERE user_id = ?",
+            (user["id"],),
+        ).fetchone()
+    return {
+        "connected": row is not None,
+        "github_login": row["github_login"] if row else None,
+        "scopes": row["scopes"] if row else "",
+        "updated_at": str(row["updated_at"]) if row else None,
+    }
+
+
+def github_linked_access_token(user_id: str) -> str:
+    with db_connection() as db:
+        row = db.execute(
+            "SELECT encrypted_access_token FROM github_accounts WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=409, detail="Link GitHub in AI TaskFlow settings before opening repositories.")
+    return decrypt_secret(row["encrypted_access_token"])
+
+
+async def github_api_get(
+    url: str,
+    access_token: str,
+    params: dict[str, Any] | None = None,
+) -> httpx.Response:
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            response = await client.get(
+                url,
+                params=params,
+                headers={
+                    "Accept": "application/vnd.github+json",
+                    "Authorization": f"Bearer {access_token}",
+                    "X-GitHub-Api-Version": "2022-11-28",
+                },
+            )
+    except httpx.TimeoutException as exc:
+        raise HTTPException(status_code=504, detail="GitHub did not respond in time. Try again.") from exc
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail="Could not reach GitHub. Check the network and try again.") from exc
+    if response.status_code == 401:
+        raise HTTPException(status_code=401, detail="GitHub authorization expired. Reconnect GitHub in AI TaskFlow settings.")
+    if response.status_code == 403:
+        raise HTTPException(
+            status_code=403,
+            detail="GitHub denied repository access. Reconnect GitHub in AI TaskFlow settings and approve repository access.",
+        )
+    if response.status_code == 404:
+        raise HTTPException(status_code=404, detail="The repository is unavailable to the linked GitHub account.")
+    if not response.is_success:
+        raise HTTPException(status_code=502, detail="GitHub could not complete the repository request.")
+    return response
+
+
+@app.get("/api/github/repositories")
+async def github_repositories(
+    page: int = Query(default=1, ge=1, le=100),
+    user: dict[str, Any] = Depends(require_session),
+):
+    access_token = github_linked_access_token(user["id"])
+    response = await github_api_get(
+        f"{GITHUB_API_BASE_URL}/user/repos",
+        access_token,
+        params={
+            "per_page": 50,
+            "page": page,
+            "sort": "updated",
+            "direction": "desc",
+            "affiliation": "owner,collaborator,organization_member",
+        },
+    )
+    try:
+        repositories = response.json()
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail="GitHub returned an invalid repository list.") from exc
+    if not isinstance(repositories, list):
+        raise HTTPException(status_code=502, detail="GitHub returned an invalid repository list.")
+
+    items = []
+    for repository in repositories:
+        if not isinstance(repository, dict):
+            raise HTTPException(status_code=502, detail="GitHub returned an invalid repository entry.")
+        full_name = repository.get("full_name")
+        is_private = repository.get("private")
+        description = repository.get("description")
+        if (not isinstance(full_name, str) or
+                not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", full_name) or
+                not isinstance(is_private, bool) or
+                (description is not None and not isinstance(description, str))):
+            raise HTTPException(status_code=502, detail="GitHub returned an invalid repository entry.")
+        permissions = repository.get("permissions")
+        items.append({
+            "full_name": full_name,
+            "private": is_private,
+            "description": description,
+            "can_push": isinstance(permissions, dict) and permissions.get("push") is True,
+        })
+    return {
+        "repositories": items,
+        "page": page,
+        "has_more": 'rel="next"' in response.headers.get("Link", ""),
+    }
+
+
+@app.post("/api/github/repositories/clone")
+async def clone_github_repository(
+    payload: GitHubRepositoryCloneRequest,
+    request: Request,
+    user: dict[str, Any] = Depends(require_session),
+):
+    if not request_is_loopback(request):
+        raise HTTPException(status_code=403, detail="GitHub repositories can only be opened on this device.")
+    owner, name = payload.full_name.split("/", 1)
+    access_token = github_linked_access_token(user["id"])
+    response = await github_api_get(
+        f"{GITHUB_API_BASE_URL}/repos/{quote(owner, safe='')}/{quote(name, safe='')}",
+        access_token,
+    )
+    try:
+        repository = response.json()
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail="GitHub returned invalid repository details.") from exc
+    returned_full_name = repository.get("full_name") if isinstance(repository, dict) else None
+    if not isinstance(returned_full_name, str) or returned_full_name.casefold() != payload.full_name.casefold():
+        raise HTTPException(status_code=502, detail="GitHub returned repository details that did not match the request.")
+    permissions = repository.get("permissions")
+    if isinstance(permissions, dict) and permissions.get("pull") is False:
+        raise HTTPException(status_code=403, detail="The linked GitHub account cannot read this repository.")
+    return await asyncio.to_thread(
+        clone_github_repository_workspace,
+        user["id"],
+        payload.project_id,
+        payload.full_name,
+        access_token,
+    )
+
+
+def require_local_git_request(request: Request) -> None:
+    if not request_is_loopback(request):
+        raise HTTPException(status_code=403, detail="Local Git operations are only available from this device.")
+
+
+@app.get("/api/github/repositories/{project_id}/git-status")
+async def github_repository_git_status(
+    project_id: str,
+    request: Request,
+    user: dict[str, Any] = Depends(require_session),
+):
+    require_local_git_request(request)
+    return await asyncio.to_thread(git_repository_status, user["id"], project_id)
+
+
+@app.post("/api/github/repositories/{project_id}/git-stage")
+async def github_repository_git_stage(
+    project_id: str,
+    payload: GitRepositoryFilesRequest,
+    request: Request,
+    user: dict[str, Any] = Depends(require_session),
+):
+    require_local_git_request(request)
+    if payload.project_id != project_id:
+        raise HTTPException(status_code=422, detail="The project identifier does not match the request.")
+    return await asyncio.to_thread(
+        git_stage_repository_files,
+        user["id"],
+        project_id,
+        payload.paths,
+        payload.stage,
+    )
+
+
+@app.post("/api/github/repositories/{project_id}/git-commit")
+async def github_repository_git_commit(
+    project_id: str,
+    payload: GitCommitRequest,
+    request: Request,
+    user: dict[str, Any] = Depends(require_session),
+):
+    require_local_git_request(request)
+    if payload.project_id != project_id:
+        raise HTTPException(status_code=422, detail="The project identifier does not match the request.")
+    with db_connection() as db:
+        github_account = db.execute(
+            "SELECT github_login FROM github_accounts WHERE user_id = ?",
+            (user["id"],),
+        ).fetchone()
+    if github_account is None:
+        raise HTTPException(status_code=409, detail="Link GitHub before creating commits for a GitHub repository.")
+    return await asyncio.to_thread(
+        git_commit_staged_changes,
+        user["id"],
+        project_id,
+        payload.title,
+        payload.description,
+        payload.author_name,
+        payload.author_email,
+    )
+
+
+@app.post("/api/github/repositories/{project_id}/git-push")
+async def github_repository_git_push(
+    project_id: str,
+    request: Request,
+    user: dict[str, Any] = Depends(require_session),
+):
+    require_local_git_request(request)
+    access_token = github_linked_access_token(user["id"])
+    status = await asyncio.to_thread(git_repository_status, user["id"], project_id)
+    repository_full_name = status["repository"]
+    if not isinstance(repository_full_name, str):
+        raise HTTPException(status_code=502, detail="The linked GitHub repository name is invalid.")
+    owner, name = repository_full_name.split("/", 1)
+    response = await github_api_get(
+        f"{GITHUB_API_BASE_URL}/repos/{quote(owner, safe='')}/{quote(name, safe='')}",
+        access_token,
+    )
+    try:
+        repository = response.json()
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail="GitHub returned invalid repository details.") from exc
+    permissions = repository.get("permissions") if isinstance(repository, dict) else None
+    if not isinstance(permissions, dict) or permissions.get("push") is not True:
+        raise HTTPException(status_code=403, detail="The linked GitHub account does not have write access to this repository.")
+    return await asyncio.to_thread(git_push_repository, user["id"], project_id, access_token)
 
 
 @app.get("/api/auth/me")
@@ -1524,11 +2253,44 @@ async def logout(
     return Response(status_code=204)
 
 
+def delete_account_data(db: Any, user_id: str) -> None:
+    db.execute("DELETE FROM auth_sessions WHERE user_id = ?", (user_id,))
+    db.execute("DELETE FROM github_accounts WHERE user_id = ?", (user_id,))
+    db.execute("DELETE FROM github_oauth_flows WHERE user_id = ?", (user_id,))
+    db.execute("DELETE FROM telegram_bots WHERE user_id = ?", (user_id,))
+    db.execute("DELETE FROM providers WHERE user_id = ?", (user_id,))
+    db.execute("DELETE FROM app_data WHERE user_id = ?", (user_id,))
+    db.execute("DELETE FROM users WHERE id = ?", (user_id,))
+
+
+@app.delete("/api/auth/account", status_code=204)
+async def delete_own_account(user: dict[str, Any] = Depends(require_session)):
+    with db_connection() as db:
+        if user["role"] == "admin":
+            other_accounts = db.execute(
+                "SELECT COUNT(*) AS count FROM users WHERE id != ?", (user["id"],)
+            ).fetchone()["count"]
+            other_admins = db.execute(
+                "SELECT COUNT(*) AS count FROM users WHERE id != ? AND role = 'admin' "
+                "AND status = 'approved' AND is_blocked = 0",
+                (user["id"],),
+            ).fetchone()["count"]
+            if other_accounts and not other_admins:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Promote another administrator before deleting the last administrator account.",
+                )
+        delete_account_data(db, user["id"])
+    await stop_telegram_bot(user["id"])
+    return Response(status_code=204)
+
+
 @app.get("/api/auth/admin/users", response_model=list[UserPublic])
 async def list_accounts(_admin: dict[str, Any] = Depends(require_admin)):
     with db_connection() as db:
         rows = db.execute(
-            "SELECT id, username, role, status, created_at FROM users ORDER BY created_at, username"
+            "SELECT id, username, role, status, is_blocked, block_note, created_at "
+            "FROM users ORDER BY created_at, username"
         ).fetchall()
     return [public_user(row) for row in rows]
 
@@ -1543,7 +2305,8 @@ async def approve_account(user_id: str, _admin: dict[str, Any] = Depends(require
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="Pending account not found.")
         row = db.execute(
-            "SELECT id, username, role, status, created_at FROM users WHERE id = ?", (user_id,)
+            "SELECT id, username, role, status, is_blocked, block_note, created_at "
+            "FROM users WHERE id = ?", (user_id,)
         ).fetchone()
     return public_user(row)
 
@@ -1558,6 +2321,53 @@ async def reject_account(user_id: str, _admin: dict[str, Any] = Depends(require_
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="Pending account not found.")
     return {"id": user_id, "status": "rejected"}
+
+
+@app.post("/api/auth/admin/users/{user_id}/block")
+async def block_account(
+    user_id: str,
+    payload: AccountBlockRequest,
+    _admin: dict[str, Any] = Depends(require_admin),
+):
+    with db_connection() as db:
+        target = db.execute("SELECT role FROM users WHERE id = ?", (user_id,)).fetchone()
+        if target is None:
+            raise HTTPException(status_code=404, detail="Account not found.")
+        if target["role"] == "admin":
+            raise HTTPException(status_code=403, detail="Administrator accounts cannot be blocked.")
+        db.execute(
+            "UPDATE users SET is_blocked = 1, block_note = ? WHERE id = ?",
+            (payload.note, user_id),
+        )
+        db.execute("DELETE FROM auth_sessions WHERE user_id = ?", (user_id,))
+    await stop_telegram_bot(user_id)
+    return {"id": user_id, "is_blocked": True, "block_note": payload.note}
+
+
+@app.post("/api/auth/admin/users/{user_id}/unblock")
+async def unblock_account(user_id: str, _admin: dict[str, Any] = Depends(require_admin)):
+    with db_connection() as db:
+        cursor = db.execute(
+            "UPDATE users SET is_blocked = 0, block_note = '' WHERE id = ? AND role = 'user' AND is_blocked = 1",
+            (user_id,),
+        )
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Blocked user account not found.")
+    await restart_telegram_bot(user_id)
+    return {"id": user_id, "is_blocked": False, "block_note": ""}
+
+
+@app.delete("/api/auth/admin/users/{user_id}", status_code=204)
+async def delete_user_account(user_id: str, _admin: dict[str, Any] = Depends(require_admin)):
+    with db_connection() as db:
+        target = db.execute("SELECT role FROM users WHERE id = ?", (user_id,)).fetchone()
+        if target is None:
+            raise HTTPException(status_code=404, detail="Account not found.")
+        if target["role"] == "admin":
+            raise HTTPException(status_code=403, detail="Administrator accounts cannot be deleted here.")
+        delete_account_data(db, user_id)
+    await stop_telegram_bot(user_id)
+    return Response(status_code=204)
 
 
 @app.put("/api/auth/admin/settings")
@@ -1582,6 +2392,435 @@ async def update_auth_settings(
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": APP_NAME, "environment": ENVIRONMENT}
+
+
+@app.get("/api/w2m/vision/status", dependencies=[Depends(require_api_token)])
+async def w2m_vision_status():
+    return local_vision_model_status()
+
+
+@app.get("/api/downloads/{download_id}", dependencies=[Depends(require_api_token)])
+async def get_model_download_status(download_id: str):
+    if download_id not in {LOCAL_VISION_DOWNLOAD_ID, "whisper", "piper-ar", "piper-en"}:
+        raise HTTPException(status_code=404, detail="معرّف تنزيل النموذج غير معروف.")
+    return download_status(download_id)
+
+
+@app.post("/api/w2m/vision/download", dependencies=[Depends(require_api_token)])
+async def download_w2m_vision_model():
+    async with LOCAL_VISION_DOWNLOAD_LOCK:
+        result = await asyncio.to_thread(download_local_vision_model)
+    return result
+
+
+@app.post("/api/w2m/vision/analyze", dependencies=[Depends(require_api_token)])
+async def analyze_w2m_image(payload: W2MVisionRequest):
+    try:
+        return await asyncio.to_thread(analyze_local_image, payload.image, payload.mode)
+    except HTTPException:
+        raise
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"تعذّر إكمال التحليل البصري المحلي: {exc}",
+        ) from exc
+
+
+@app.post("/api/programming/run", dependencies=[Depends(require_api_token)])
+async def run_programming_command(
+    payload: ProgrammingRunRequest,
+    request: Request,
+    principal: dict[str, Any] | None = Depends(require_api_token),
+):
+    if not request_is_loopback(request):
+        raise HTTPException(
+            status_code=403,
+            detail="Local programming commands are only available from this device.",
+        )
+    if auth_settings()["multi_user_enabled"] and (
+        principal is None or principal.get("role") != "admin"
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Only the local administrator may run computer commands in multi-user mode.",
+        )
+    owner_id = principal["id"] if principal else None
+    files = [item.model_dump() for item in payload.files]
+    return await asyncio.to_thread(
+        run_project_command,
+        owner_id,
+        payload.project_id,
+        payload.shell,
+        payload.command,
+        files,
+    )
+
+
+@app.post("/api/programming/workspace", dependencies=[Depends(require_api_token)])
+async def open_programming_workspace(
+    payload: ProgrammingWorkspaceRequest,
+    request: Request,
+    principal: dict[str, Any] | None = Depends(require_api_token),
+):
+    if not request_is_loopback(request):
+        raise HTTPException(status_code=403, detail="Programming workspaces are only available from this device.")
+    owner_id = principal["id"] if principal else None
+    return await asyncio.to_thread(
+        initialize_project_workspace,
+        owner_id,
+        payload.project_id,
+        [item.model_dump() for item in payload.files],
+    )
+
+
+@app.get("/api/programming/workspace/{project_id}", dependencies=[Depends(require_api_token)])
+async def get_programming_workspace(
+    project_id: str,
+    request: Request,
+    principal: dict[str, Any] | None = Depends(require_api_token),
+):
+    if not request_is_loopback(request):
+        raise HTTPException(status_code=403, detail="Programming workspaces are only available from this device.")
+    owner_id = principal["id"] if principal else None
+    return await asyncio.to_thread(read_project_workspace, owner_id, project_id)
+
+
+@app.put("/api/programming/workspace", dependencies=[Depends(require_api_token)])
+async def update_programming_workspace(
+    payload: ProgrammingWorkspaceRequest,
+    request: Request,
+    principal: dict[str, Any] | None = Depends(require_api_token),
+):
+    if not request_is_loopback(request):
+        raise HTTPException(status_code=403, detail="Programming workspaces are only available from this device.")
+    owner_id = principal["id"] if principal else None
+    return await asyncio.to_thread(
+        write_project_workspace,
+        owner_id,
+        payload.project_id,
+        [item.model_dump() for item in payload.files],
+    )
+
+
+def _run_theme_store_git(repository: Path, arguments: list[str], check: bool = True):
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repository), *arguments],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+            env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise HTTPException(status_code=504, detail="انتهت مهلة الاتصال بمستودع الثيمات.") from exc
+    if check and result.returncode:
+        if arguments[0] == "push":
+            detail = "تعذّر رفع السمة عبر Git. تحقق من صلاحية الكتابة إلى المستودع وقواعد حماية الفرع."
+        else:
+            detail = "تعذّر تنفيذ عملية Git على مستودع الثيمات."
+        raise HTTPException(status_code=502, detail=detail)
+    return result
+
+
+def publish_marketplace_theme(
+    theme_id: str,
+    name: str,
+    author: str,
+    description: str,
+    theme_content: bytes,
+    readme_content: str,
+    preview_content: bytes | None,
+    preview_extension: str | None,
+    repository_url: str = THEME_STORE_REPOSITORY_URL,
+) -> dict[str, str | bool]:
+    try:
+        theme = json.loads(theme_content.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=422, detail="ملف السمة يجب أن يكون JSON صالحًا بترميز UTF-8.") from exc
+    if not isinstance(theme, dict) or theme.get("name") != name or not isinstance(theme.get("colors"), dict):
+        raise HTTPException(status_code=422, detail="اسم السمة أو بنيتها لا يطابق البيانات المقدمة.")
+    if not name or len(name) > 80 or name.strip() != name:
+        raise HTTPException(status_code=422, detail="اسم السمة يجب أن يتراوح بين حرف واحد و80 حرفًا دون مسافات طرفية.")
+    if any(key not in {
+        "name", "glass", "colors", "sizes", "fonts", "glassSettings", "controls", "buttonSettings", "motion"
+    } for key in theme):
+        raise HTTPException(status_code=422, detail="ملف السمة يحتوي على حقول غير مدعومة في Theme Coding v3.")
+    if any(key not in THEME_COLOR_KEYS or not isinstance(value, str) or
+           not re.fullmatch(r"#[0-9a-fA-F]{6}", value)
+           for key, value in theme["colors"].items()):
+        raise HTTPException(status_code=422, detail="ملف السمة يحتوي على مفاتيح أو ألوان غير مدعومة في Theme Coding v3.")
+    if "glass" in theme and not isinstance(theme["glass"], bool):
+        raise HTTPException(status_code=422, detail="إعداد Glass في ملف السمة غير صالح.")
+    if "sizes" in theme:
+        sizes = theme["sizes"]
+        if not isinstance(sizes, dict) or any(
+            key not in THEME_SIZE_LIMITS or isinstance(value, bool) or not isinstance(value, (int, float)) or
+            not THEME_SIZE_LIMITS[key][0] <= value <= THEME_SIZE_LIMITS[key][1]
+            for key, value in sizes.items()
+        ):
+            raise HTTPException(status_code=422, detail="ملف السمة يحتوي على أحجام غير مدعومة في Theme Coding v3.")
+    if "fonts" in theme:
+        fonts = theme["fonts"]
+        if not isinstance(fonts, dict) or any(
+            key not in THEME_FONT_OPTIONS or not isinstance(value, str) or value not in THEME_FONT_OPTIONS[key]
+            for key, value in fonts.items()
+        ):
+            raise HTTPException(status_code=422, detail="ملف السمة يحتوي على خطوط غير مدعومة.")
+    if "glassSettings" in theme:
+        glass_settings = theme["glassSettings"]
+        if not isinstance(glass_settings, dict) or any(
+            (key == "tint" and (not isinstance(value, str) or not re.fullmatch(r"#[0-9a-fA-F]{6}", value))) or
+            (key != "tint" and (
+                key not in THEME_GLASS_LIMITS or isinstance(value, bool) or not isinstance(value, (int, float)) or
+                not THEME_GLASS_LIMITS[key][0] <= value <= THEME_GLASS_LIMITS[key][1]
+            ))
+            for key, value in glass_settings.items()
+        ):
+            raise HTTPException(status_code=422, detail="ملف السمة يحتوي على إعدادات زجاج غير مدعومة.")
+    if "controls" in theme:
+        controls = theme["controls"]
+        if not isinstance(controls, list) or len(controls) > len(THEME_SETTING_CONTROLS) or any(
+            not isinstance(control, str) or control not in THEME_SETTING_CONTROLS for control in controls
+        ) or len(set(controls)) != len(controls):
+            raise HTTPException(status_code=422, detail="ملف السمة يحتوي على إعدادات تحكم غير مدعومة أو مكررة.")
+    if "buttonSettings" in theme:
+        button_settings = theme["buttonSettings"]
+        if not isinstance(button_settings, dict) or any(
+            (key == "style" and (not isinstance(value, str) or value not in THEME_BUTTON_STYLES)) or
+            (key in THEME_BUTTON_LIMITS and (
+                isinstance(value, bool) or not isinstance(value, (int, float)) or
+                not THEME_BUTTON_LIMITS[key][0] <= value <= THEME_BUTTON_LIMITS[key][1]
+            )) or
+            key not in {*THEME_BUTTON_LIMITS, "style"}
+            for key, value in button_settings.items()
+        ):
+            raise HTTPException(status_code=422, detail="ملف السمة يحتوي على إعدادات أزرار غير مدعومة.")
+    if "motion" in theme:
+        motion = theme["motion"]
+        if not isinstance(motion, dict) or any(
+            (key == "preset" and (not isinstance(value, str) or value not in THEME_MOTION_PRESETS)) or
+            (key in THEME_MOTION_LIMITS and (
+                isinstance(value, bool) or not isinstance(value, (int, float)) or
+                not THEME_MOTION_LIMITS[key][0] <= value <= THEME_MOTION_LIMITS[key][1]
+            )) or
+            key not in {*THEME_MOTION_LIMITS, "preset"}
+            for key, value in motion.items()
+        ):
+            raise HTTPException(status_code=422, detail="ملف السمة يحتوي على إعدادات حركة غير مدعومة.")
+    if not readme_content.strip() or len(readme_content.encode("utf-8")) > MAX_THEME_README_BYTES:
+        raise HTTPException(status_code=422, detail="أرفق ملف README غير فارغ وأقل من 50 كيلوبايت.")
+    if (preview_content is None) != (preview_extension is None):
+        raise HTTPException(status_code=422, detail="ملف معاينة السمة غير مكتمل.")
+
+    with tempfile.TemporaryDirectory(prefix="taskflow-theme-store-") as temporary_directory:
+        repository = Path(temporary_directory) / "repository"
+        try:
+            clone = subprocess.run(
+                ["git", "clone", "--no-checkout", repository_url, str(repository)],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=False,
+                env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise HTTPException(status_code=504, detail="انتهت مهلة الاتصال بمستودع الثيمات.") from exc
+        if clone.returncode:
+            raise HTTPException(
+                status_code=503,
+                detail="تعذّر الوصول إلى مستودع الثيمات. تأكد من إنشاء المستودع العام وإعداد Git لهذا الحساب.",
+            )
+        refs = _run_theme_store_git(repository, ["ls-remote", "--heads", "origin", "main"])
+        if refs.stdout.strip():
+            _run_theme_store_git(repository, ["checkout", "-B", "main", "origin/main"])
+        else:
+            _run_theme_store_git(repository, ["checkout", "--orphan", "main"])
+
+        catalog_path = repository / "catalog.json"
+        if catalog_path.exists():
+            try:
+                catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise HTTPException(status_code=422, detail="فهرس المستودع غير صالح؛ أصلح catalog.json قبل النشر.") from exc
+            if not isinstance(catalog, dict) or catalog.get("version") != 1 or any(
+                not isinstance(catalog.get(kind), list) for kind in ("themes", "extensions", "skills")
+            ):
+                raise HTTPException(status_code=422, detail="بنية فهرس المتجر غير مدعومة.")
+        else:
+            catalog = {"version": 1, "themes": [], "extensions": [], "skills": []}
+            catalog_path.write_text(json.dumps(catalog, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        if any(isinstance(item, dict) and item.get("id") == theme_id for item in catalog["themes"]):
+            raise HTTPException(status_code=409, detail="معرّف السمة مستخدم بالفعل في المتجر.")
+
+        theme_path = Path("themes") / f"{theme_id}.json"
+        readme_path = Path("themes") / theme_id / "README.md"
+        preview_path = Path("themes") / theme_id / f"preview.{preview_extension}" if preview_extension else None
+        absolute_theme_path = repository / theme_path
+        absolute_readme_path = repository / readme_path
+        absolute_theme_path.parent.mkdir(parents=True, exist_ok=True)
+        absolute_readme_path.parent.mkdir(parents=True, exist_ok=True)
+        absolute_theme_path.write_bytes(theme_content)
+        absolute_readme_path.write_text(readme_content, encoding="utf-8")
+        staged_paths = [theme_path.as_posix(), readme_path.as_posix()]
+        preview_asset = None
+        if preview_content is not None and preview_path is not None:
+            absolute_preview_path = repository / preview_path
+            absolute_preview_path.write_bytes(preview_content)
+            preview_asset = preview_path.as_posix()
+            staged_paths.append(preview_asset)
+
+        catalog["themes"].append({
+            "id": theme_id,
+            "name": name,
+            "description": description,
+            "asset": theme_path.as_posix(),
+            "author": author,
+            "readme": readme_path.as_posix(),
+            **({"preview": preview_asset} if preview_asset else {}),
+        })
+        catalog_path.write_text(json.dumps(catalog, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        _run_theme_store_git(repository, ["add", "--", "catalog.json", *staged_paths])
+        _run_theme_store_git(repository, [
+            "-c", "user.name=AI TaskFlow Theme Store",
+            "-c", "user.email=themes@ai-taskflow.local",
+            "commit", "-m", f"Add theme: {theme_id}",
+        ])
+        _run_theme_store_git(repository, ["push", "origin", "main"])
+
+    return {
+        "published": True,
+        "theme_id": theme_id,
+        "url": f"https://github.com/ADAM-MAHMOUD12/AI-TASKFLOW-CODE-THEMES-EXTENSIONS/tree/main/themes/{theme_id}",
+    }
+
+
+@app.post("/api/themes/publish", dependencies=[Depends(require_api_token)])
+async def publish_theme_from_editor(
+    request: Request,
+    theme_id: str = Form(...),
+    name: str = Form(...),
+    author: str = Form(...),
+    description: str = Form(...),
+    readme: str = Form(...),
+    theme_file: UploadFile = File(...),
+    preview: UploadFile | None = File(default=None),
+    principal: dict[str, Any] | None = Depends(require_api_token),
+):
+    if not request_is_loopback(request):
+        raise HTTPException(status_code=403, detail="نشر الثيمات متاح من هذا الجهاز فقط.")
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", theme_id):
+        raise HTTPException(status_code=422, detail="استخدم معرّفًا فريدًا من أحرف إنجليزية صغيرة وأرقام وشرطات.")
+    if not name.strip() or len(name) > 80 or not author.strip() or len(author) > 80:
+        raise HTTPException(status_code=422, detail="اسم السمة أو الصانع فارغ أو أطول من الحد المسموح.")
+    if not description.strip() or len(description) > 500:
+        raise HTTPException(status_code=422, detail="الوصف مطلوب ويجب ألا يتجاوز 500 حرف.")
+    theme_content = await theme_file.read(MAX_THEME_FILE_BYTES + 1)
+    if not theme_content or len(theme_content) > MAX_THEME_FILE_BYTES:
+        raise HTTPException(status_code=413, detail="ملف السمة فارغ أو يتجاوز 128 كيلوبايت.")
+    preview_content = None
+    preview_extension = None
+    if preview is not None and preview.filename:
+        preview_content = await preview.read(MAX_THEME_PREVIEW_BYTES + 1)
+        if not preview_content or len(preview_content) > MAX_THEME_PREVIEW_BYTES:
+            raise HTTPException(status_code=413, detail="صورة المعاينة فارغة أو تتجاوز 5 ميغابايت.")
+        preview_type = (preview.content_type or "").lower()
+        signatures = {
+            "image/png": (".png", preview_content.startswith(b"\x89PNG\r\n\x1a\n")),
+            "image/jpeg": (".jpg", preview_content.startswith(b"\xff\xd8\xff")),
+            "image/webp": (".webp", preview_content.startswith(b"RIFF") and preview_content[8:12] == b"WEBP"),
+        }
+        signature = signatures.get(preview_type)
+        if not signature or not signature[1]:
+            raise HTTPException(status_code=415, detail="اختر صورة معاينة PNG أو JPEG أو WebP صالحة.")
+        preview_extension = signature[0].removeprefix(".")
+
+    return await asyncio.to_thread(
+        publish_marketplace_theme,
+        theme_id,
+        name.strip(),
+        author.strip(),
+        description.strip(),
+        theme_content,
+        readme,
+        preview_content,
+        preview_extension,
+    )
+
+
+@app.post("/api/programming/extensions/upload", dependencies=[Depends(require_api_token)])
+async def upload_programming_extension(
+    request: Request,
+    extension: UploadFile = File(...),
+    principal: dict[str, Any] | None = Depends(require_api_token),
+):
+    if not request_is_loopback(request):
+        raise HTTPException(status_code=403, detail="Local extensions can only be installed from this device.")
+    filename = Path(extension.filename or "").name
+    if not filename.lower().endswith(".vsix"):
+        raise HTTPException(status_code=415, detail="اختر حزمة إضافة بامتداد VSIX.")
+    content = await extension.read(MAX_PROGRAMMING_EXTENSION_BYTES + 1)
+    if not content:
+        raise HTTPException(status_code=422, detail="حزمة الإضافة فارغة.")
+    if len(content) > MAX_PROGRAMMING_EXTENSION_BYTES:
+        raise HTTPException(status_code=413, detail="يجب ألا يتجاوز حجم حزمة الإضافة 50 ميغابايت.")
+
+    try:
+        with zipfile.ZipFile(io.BytesIO(content)) as archive:
+            entries = archive.infolist()
+            if len(entries) > 10_000 or sum(entry.file_size for entry in entries) > 250 * 1024 * 1024:
+                raise HTTPException(status_code=413, detail="محتويات حزمة الإضافة تتجاوز الحدود المدعومة.")
+            if len({entry.filename for entry in entries}) != len(entries):
+                raise HTTPException(status_code=422, detail="حزمة الإضافة تحتوي على مسارات مكررة.")
+            manifest = archive.getinfo("extension/package.json")
+            vsix_manifest = archive.getinfo("extension.vsixmanifest")
+            if manifest.file_size > 1_000_000 or vsix_manifest.file_size > 1_000_000:
+                raise HTTPException(status_code=413, detail="بيانات حزمة الإضافة كبيرة جدًا.")
+            package = json.loads(archive.read(manifest).decode("utf-8"))
+            if not isinstance(package, dict) or not isinstance(package.get("name"), str) or not isinstance(package.get("version"), str):
+                raise HTTPException(status_code=422, detail="بيانات حزمة VSIX غير صالحة.")
+    except (zipfile.BadZipFile, KeyError, UnicodeDecodeError, json.JSONDecodeError,
+            RuntimeError, OSError, NotImplementedError) as exc:
+        raise HTTPException(status_code=422, detail="الملف ليس حزمة VSIX صالحة.") from exc
+
+    if PROGRAMMING_EXTENSIONS_ROOT.is_symlink():
+        raise HTTPException(status_code=400, detail="مسار تخزين الإضافات المحلية غير صالح.")
+    root = PROGRAMMING_EXTENSIONS_ROOT.resolve()
+    owner_key = hashlib.sha256((principal["id"] if principal else "local").encode("utf-8")).hexdigest()
+    owner_directory = root / owner_key
+    if owner_directory.is_symlink():
+        raise HTTPException(status_code=400, detail="مسار تخزين الإضافات المحلية غير صالح.")
+    owner_directory.mkdir(parents=True, exist_ok=True)
+    owner_directory = owner_directory.resolve()
+    if not owner_directory.is_relative_to(root):
+        raise HTTPException(status_code=400, detail="مسار تخزين الإضافات المحلية خارج المجلد المسموح.")
+    extension_id = uuid.uuid4().hex
+    extension_path = owner_directory / f"{extension_id}.vsix"
+    extension_path.write_bytes(content)
+    return {"id": extension_id, "plugin_entry": extension_path.as_uri()}
+
+
+@app.delete("/api/programming/extensions/{extension_id}", status_code=204, dependencies=[Depends(require_api_token)])
+async def delete_programming_extension(
+    extension_id: str,
+    request: Request,
+    principal: dict[str, Any] | None = Depends(require_api_token),
+):
+    if not request_is_loopback(request):
+        raise HTTPException(status_code=403, detail="Local extensions can only be managed from this device.")
+    if not re.fullmatch(r"[a-f0-9]{32}", extension_id):
+        raise HTTPException(status_code=422, detail="معرّف حزمة الإضافة غير صالح.")
+    if PROGRAMMING_EXTENSIONS_ROOT.is_symlink():
+        raise HTTPException(status_code=400, detail="مسار تخزين الإضافات المحلية غير صالح.")
+    root = PROGRAMMING_EXTENSIONS_ROOT.resolve()
+    owner_key = hashlib.sha256((principal["id"] if principal else "local").encode("utf-8")).hexdigest()
+    owner_directory = root / owner_key
+    if owner_directory.is_symlink():
+        raise HTTPException(status_code=400, detail="مسار تخزين الإضافات المحلية غير صالح.")
+    extension_path = owner_directory / f"{extension_id}.vsix"
+    if extension_path.exists():
+        extension_path.unlink()
+    return None
 
 
 PIPER_REVISION = "ae9d8352b73c1b1750748843e753a504b00e05b0"
@@ -1614,8 +2853,14 @@ PIPER_DOWNLOAD_LOCKS = {language: asyncio.Lock() for language in PIPER_VOICES}
 WHISPER_MODEL_REPO = "Systran/faster-whisper-base"
 WHISPER_MODEL_REVISION = "ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66"
 WHISPER_MODEL_DIR = Path(__file__).resolve().parent / "data" / "speech-models" / "faster-whisper-base"
-WHISPER_MODEL_SIZE_BYTES = 145217532
-WHISPER_MODEL_FILES = ("config.json", "model.bin", "tokenizer.json", "vocabulary.txt")
+WHISPER_MODEL_FILE_SIZES = {
+    "config.json": 2309,
+    "model.bin": 145217532,
+    "tokenizer.json": 2203239,
+    "vocabulary.txt": 459861,
+}
+WHISPER_MODEL_FILES = tuple(WHISPER_MODEL_FILE_SIZES)
+WHISPER_MODEL_SIZE_BYTES = sum(WHISPER_MODEL_FILE_SIZES.values())
 WHISPER_MODEL_LOCK = threading.Lock()
 WHISPER_TRANSCRIBE_LOCK = threading.Lock()
 WHISPER_DOWNLOAD_LOCK = asyncio.Lock()
@@ -1651,7 +2896,10 @@ def piper_voice_installed(language: str) -> bool:
 
 
 def whisper_model_installed() -> bool:
-    return all((WHISPER_MODEL_DIR / name).is_file() for name in WHISPER_MODEL_FILES)
+    return all(
+        (WHISPER_MODEL_DIR / name).is_file() and (WHISPER_MODEL_DIR / name).stat().st_size == expected
+        for name, expected in WHISPER_MODEL_FILE_SIZES.items()
+    )
 
 
 def load_whisper_model():
@@ -1691,12 +2939,23 @@ def download_whisper_model():
             status_code=503,
             detail="مكتبة تنزيل نموذج الكلام غير مثبّتة. أعد تشغيل المشغّل لتثبيت الاعتمادات.",
         ) from exc
-    snapshot_download(
-        repo_id=WHISPER_MODEL_REPO,
-        revision=WHISPER_MODEL_REVISION,
-        local_dir=str(WHISPER_MODEL_DIR),
-        allow_patterns=list(WHISPER_MODEL_FILES),
+    existing_bytes = sum(
+        expected
+        for name, expected in WHISPER_MODEL_FILE_SIZES.items()
+        if (WHISPER_MODEL_DIR / name).is_file() and
+        (WHISPER_MODEL_DIR / name).stat().st_size == expected
     )
+    begin_download("whisper", WHISPER_MODEL_SIZE_BYTES, min(existing_bytes, WHISPER_MODEL_SIZE_BYTES))
+    try:
+        snapshot_download(
+            repo_id=WHISPER_MODEL_REPO,
+            revision=WHISPER_MODEL_REVISION,
+            local_dir=str(WHISPER_MODEL_DIR),
+            allow_patterns=list(WHISPER_MODEL_FILES),
+            tqdm_class=huggingface_tqdm_class("whisper"),
+        )
+    finally:
+        finish_download("whisper", whisper_model_installed())
     if not whisper_model_installed():
         raise HTTPException(status_code=502, detail="اكتمل تنزيل النموذج لكن بعض ملفاته المطلوبة مفقودة.")
     return load_whisper_model()
@@ -1716,7 +2975,14 @@ def transcribe_whisper_file(path: str, language: str) -> dict[str, Any]:
         return {"text": text, "language": info.language, "duration": info.duration}
 
 
-async def download_piper_asset(path: str, target: Path, expected_size: int, expected_hash: str, hash_kind: str) -> None:
+async def download_piper_asset(
+    path: str,
+    target: Path,
+    expected_size: int,
+    expected_hash: str,
+    hash_kind: str,
+    download_id: str,
+) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary_path = target.with_name(target.name + ".part")
     digest = hashlib.sha256() if hash_kind == "sha256" else hashlib.sha1()
@@ -1738,6 +3004,7 @@ async def download_piper_asset(path: str, target: Path, expected_size: int, expe
                             raise HTTPException(status_code=502, detail="حجم ملف الصوت أكبر من المتوقع؛ أُوقف التنزيل.")
                         output.write(chunk)
                         digest.update(chunk)
+                        advance_download(download_id, len(chunk))
         if byte_count != expected_size:
             raise HTTPException(status_code=502, detail="حجم ملف الصوت لا يطابق النسخة الرسمية.")
         if hash_kind == "sha256" and digest.hexdigest() != expected_hash:
@@ -1839,12 +3106,27 @@ async def download_piper_voice(language: Literal["ar", "en"]):
         if not piper_voice_installed(language):
             voice = PIPER_VOICES[language]
             model_path, config_path = piper_voice_paths(language)
-            await download_piper_asset(
-                voice["model"], model_path, voice["model_size"], voice["model_sha256"], "sha256"
+            download_id = f"piper-{language}"
+            existing_bytes = sum(
+                path.stat().st_size
+                for path, expected_size in (
+                    (model_path, voice["model_size"]),
+                    (config_path, voice["config_size"]),
+                )
+                if path.is_file() and path.stat().st_size == expected_size
             )
-            await download_piper_asset(
-                voice["config"], config_path, voice["config_size"], voice["config_sha1"], "sha1"
-            )
+            begin_download(download_id, voice["model_size"] + voice["config_size"], existing_bytes)
+            try:
+                if not model_path.is_file() or model_path.stat().st_size != voice["model_size"]:
+                    await download_piper_asset(
+                        voice["model"], model_path, voice["model_size"], voice["model_sha256"], "sha256", download_id
+                    )
+                if not config_path.is_file() or config_path.stat().st_size != voice["config_size"]:
+                    await download_piper_asset(
+                        voice["config"], config_path, voice["config_size"], voice["config_sha1"], "sha1", download_id
+                    )
+            finally:
+                finish_download(download_id, piper_voice_installed(language))
             load_piper_voice.cache_clear()
     return {"language": language, "voice": PIPER_VOICES[language]["id"], "installed": True}
 
@@ -2914,6 +4196,27 @@ async def delete_app_data(
         )
     return None
 
+
+@app.get("/api/skills/library/search", dependencies=[Depends(require_api_token)])
+async def search_skill_library(
+    q: str = Query(min_length=2, max_length=100),
+):
+    return {"skills": await search_public_skills(q)}
+
+
+@app.get("/api/skills/library/popular", dependencies=[Depends(require_api_token)])
+async def list_popular_skill_library():
+    return {"skills": await list_public_popular_skills()}
+
+
+@app.get("/api/skills/library/content", dependencies=[Depends(require_api_token)])
+async def read_skill_library_content(
+    source: str = Query(min_length=3, max_length=200),
+    skill_id: str = Query(min_length=1, max_length=100),
+):
+    return await fetch_public_skill(source, skill_id)
+
+
 @app.get("/api/providers", response_model=list[ProviderPublic], dependencies=[Depends(require_api_token)])
 async def list_providers(principal: dict[str, Any] | None = Depends(require_api_token)):
     with db_connection() as db:
@@ -3111,6 +4414,24 @@ async def chat_stream(
         "stream": True,
     }
 
+    async def non_stream_fallback():
+        try:
+            content, usage = await provider_request(
+                row,
+                payload.message,
+                payload.system_prompt,
+                payload.temperature,
+                payload.max_tokens,
+                payload.images,
+            )
+            yield f"data: {json.dumps({'type': 'delta', 'text': content}, ensure_ascii=False)}\n\n"
+            if usage:
+                yield f"data: {json.dumps({'type': 'usage', 'usage': usage}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
+        except HTTPException as exc:
+            message = exc.detail if isinstance(exc.detail, str) else "تعذّر إكمال الطلب لدى مزوّد AI."
+            yield f"data: {json.dumps({'type': 'error', 'message': message}, ensure_ascii=False)}\n\n"
+
     async def stream_events():
         try:
             async with httpx.AsyncClient(timeout=httpx.Timeout(10800.0, connect=12.0)) as client:
@@ -3129,6 +4450,10 @@ async def chat_stream(
                                     content = "".join(item.get("text", "") or item.get("content", "") for item in content if isinstance(item, dict))
                             if isinstance(content, str) and content:
                                 yield f"data: {json.dumps({'type': 'delta', 'text': content}, ensure_ascii=False)}\n\n"
+                            else:
+                                async for event in non_stream_fallback():
+                                    yield event
+                                return
                             usage = extract_usage(data, row["model"])
                             if usage:
                                 yield f"data: {json.dumps({'type': 'usage', 'usage': usage}, ensure_ascii=False)}\n\n"
@@ -3137,6 +4462,7 @@ async def chat_stream(
                         except (json.JSONDecodeError, KeyError, IndexError, TypeError, UnicodeDecodeError):
                             yield f"data: {json.dumps({'type': 'error', 'message': 'ØµÙŠغة Ø§Ù„رد Ù…Ù† Ù…Ø²ÙˆÙ‘د AI ØºÙŠر Ù…ØªÙˆØ§ÙÙ‚ة.'}, ensure_ascii=False)}\n\n"
                             return
+                    streamed_content = False
                     async for line in response.aiter_lines():
                         if not line.startswith("data:"):
                             continue
@@ -3161,16 +4487,22 @@ async def chat_stream(
                                     delta = "".join(item.get("text", "") or item.get("content", "") for item in delta if isinstance(item, dict))
                                 finish_reason = choice.get("finish_reason")
                             if isinstance(delta, str) and delta:
+                                streamed_content = True
                                 yield f"data: {json.dumps({'type': 'delta', 'text': delta}, ensure_ascii=False)}\n\n"
                             if finish_reason:
                                 yield f"data: {json.dumps({'type': 'finish', 'reason': finish_reason}, ensure_ascii=False)}\n\n"
                         except (json.JSONDecodeError, IndexError, AttributeError, TypeError):
                             continue
+                    if not streamed_content:
+                        async for event in non_stream_fallback():
+                            yield event
+                        return
             yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
         except httpx.TimeoutException:
             yield f"data: {json.dumps({'type': 'error', 'message': 'Ø§Ù†ØªÙ‡ت Ù…Ù‡Ù„ة Ø§Ù„Ù…Ø²ÙˆÙ‘د Ø£Ø«Ù†اء ØªÙˆÙ„ÙŠد Ø§Ù„رد.'}, ensure_ascii=False)}\n\n"
         except httpx.HTTPStatusError as exc:
-            yield f"data: {json.dumps({'type': 'error', 'message': f'رفض Ù…Ø²ÙˆÙ‘د AI Ø§Ù„Ø·Ù„ب (HTTP {exc.response.status_code}).'}, ensure_ascii=False)}\n\n"
+            _, detail = provider_http_error(exc.response.status_code, row["name"])
+            yield f"data: {json.dumps({'type': 'error', 'message': detail}, ensure_ascii=False)}\n\n"
         except httpx.HTTPError:
             yield f"data: {json.dumps({'type': 'error', 'message': 'ØªØ¹Ø°Ù‘ر Ø§Ù„Ø§ØªØµØ§Ù„ Ø¨Ù…Ø²ÙˆÙ‘د AI Ø£Ø«Ù†اء بث Ø§Ù„رد.'}, ensure_ascii=False)}\n\n"
 
@@ -3179,41 +4511,6 @@ async def chat_stream(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
-
-@app.post("/api/terminal/run", dependencies=[Depends(require_api_token)])
-async def run_local_command(payload: TerminalRunRequest):
-    command = "npm run build" if payload.command == "build" else "npm run lint"
-    project_root = Path(__file__).resolve().parent.parent
-    npm = shutil.which("npm")
-    if not npm:
-        raise HTTPException(status_code=503, detail="Ù„Ù… ÙŠØªÙ… Ø§Ù„Ø¹Ø«Ùˆر Ø¹Ù„Ù‰ npm ÙÙŠ Ø¨ÙŠئة Ø§Ù„Ø®Ø§Ø¯Ù… Ø§Ù„Ù…Ø­Ù„ÙŠ.")
-
-    try:
-        if sys.platform == "win32":
-            process = await asyncio.create_subprocess_exec(
-                os.getenv("COMSPEC", "cmd.exe"), "/d", "/s", "/c", command,
-                cwd=project_root,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-            )
-        else:
-            process = await asyncio.create_subprocess_exec(
-                npm, "run", payload.command,
-                cwd=project_root,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-            )
-        output_bytes, _ = await asyncio.wait_for(process.communicate(), timeout=120)
-    except asyncio.TimeoutError:
-        process.kill()
-        await process.wait()
-        raise HTTPException(status_code=504, detail="ØªØ¬Ø§Ùˆز Ø§Ù„Ø£Ù…ر Ø§Ù„حد Ø§Ù„Ø²Ù…Ù†ÙŠ Ø§Ù„Ù…Ø³Ù…Ùˆح (120 Ø«Ø§Ù†ÙŠة).")
-    except OSError as exc:
-        raise HTTPException(status_code=500, detail="ØªØ¹Ø°Ù‘ر ØªØ´ØºÙŠÙ„ Ø§Ù„Ø£Ù…ر Ø§Ù„Ù…Ø­Ù„ÙŠ Ø§Ù„Ù…Ø³Ù…Ùˆح.") from exc
-
-    output = output_bytes.decode("utf-8", errors="replace")
-    output = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", output)[-16000:]
-    return {"command": command, "exit_code": process.returncode, "output": output}
 
 @app.post("/api/search", dependencies=[Depends(require_api_token)])
 async def search(

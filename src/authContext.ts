@@ -5,6 +5,8 @@ export type AuthUser = {
   username: string;
   role: "admin" | "user";
   status: "approved" | "pending" | "rejected";
+  is_blocked?: boolean;
+  block_note?: string;
   created_at: string;
 };
 
@@ -15,6 +17,7 @@ export type AuthStatus = {
   engine_2d_enabled: boolean;
   engine_3d_enabled: boolean;
   engine_openfilm_enabled: boolean;
+  github_oauth_enabled: boolean;
   account_count: number;
   registration_open: boolean;
 };
@@ -24,6 +27,7 @@ export type AuthContextValue = {
   status: AuthStatus | null;
   refreshStatus: () => Promise<void>;
   logout: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
 };
 
 export const AuthContext = createContext<AuthContextValue | null>(null);

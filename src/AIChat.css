@@ -338,45 +338,6 @@
   background: rgba(14, 16, 26, 0.5);
 }
 
-.ai-chat-context-meter {
-  display: grid;
-  gap: 5px;
-  padding: 8px 24px 9px;
-  border-bottom: 1px solid var(--border);
-  background: rgba(12, 14, 22, 0.4);
-}
-
-.ai-chat-context-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  color: var(--muted);
-  font-size: 10px;
-}
-
-.ai-chat-context-meta strong {
-  color: #c4b5fd;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-}
-
-.ai-chat-context-track {
-  height: 4px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.ai-chat-context-track span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #8b5cf6, #06b6d4);
-  box-shadow: 0 0 8px rgba(139, 92, 246, 0.4);
-  transition: width 0.3s ease;
-}
-
 .ai-chat-toolbar label {
   display: grid;
   gap: 6px;

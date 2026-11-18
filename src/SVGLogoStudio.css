@@ -17,6 +17,15 @@
 .svg-logo-ai-title small { margin-inline-start: auto; color: var(--design-gold); font-size: 9px; }
 .svg-logo-ai textarea { width: 100%; min-width: 0; min-height: 72px; max-height: 150px; resize: vertical; padding: 10px 12px; border: 1px solid #35504c; border-radius: 9px; background: #0b1416; color: #e7f2ef; font-size: 11px; line-height: 1.7; }
 .svg-logo-documents { grid-column: 1 / -1; min-width: 0; }
+.svg-logo-vision { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; grid-column: 1 / -1; gap: 8px; padding: 9px 11px; border: 1px solid #2e635b; border-radius: 8px; background: #10211f; color: #b7eee2; }
+.svg-logo-vision > div { display: grid; gap: 3px; }
+.svg-logo-vision strong { font-size: 10px; }
+.svg-logo-vision small,.svg-logo-vision label { color: #93b4aa; font-size: 9px; }
+.svg-logo-vision label { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; grid-column: 1 / -1; }
+.svg-logo-vision input { max-width: 100%; color: #c5d8d2; font-size: 9px; }
+.svg-logo-vision button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 30px; padding: 5px 9px; border: 1px solid #31796d; border-radius: 6px; background: #15362f; color: #c8fff1; font-size: 9px; }
+.svg-logo-vision button:disabled { opacity: .55; cursor: not-allowed; }
+.svg-logo-vision .svg-logo-vision-clear { justify-self: start; grid-column: 1 / -1; border-color: #514550; background: #292127; color: #e3c9cf; }
 .svg-logo-ai-actions { display: flex; align-items: center; gap: 6px; }
 .svg-logo-ai-actions select { width: min(240px,24vw); min-width: 130px; height: 34px; padding: 5px 8px; border: 1px solid #39364b; border-radius: 6px; background: #12121d; color: #eeedf7; font-size: 8px; }
 .svg-logo-ai-actions .svg-logo-stop { border-color: #78454a; background: #48262b; color: #ffd1d1; }

@@ -1,12 +1,20 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { API_BASE, apiFetch, getSessionToken, setSessionToken } from "./api";
 import { clearAppDataCache } from "./appData";
+import { Workflow } from "lucide-react";
 import { saveLanguage, translate, useLanguage } from "./localization";
 import { AuthContext, type AuthStatus, type AuthUser } from "./authContext";
+import GlassAppearanceControl from "./GlassAppearanceControl";
 import "./AuthGate.css";
 
-function messageFrom(response: Response, body: { detail?: string }) {
-  return body.detail || `Request failed (${response.status}).`;
+function messageFrom(response: Response, body: unknown) {
+  return isRecord(body) && typeof body.detail === "string"
+    ? body.detail
+    : `Request failed (${response.status}).`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 export default function AuthGate({ children }: { children: ReactNode }) {
@@ -97,7 +105,19 @@ export default function AuthGate({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
-  const context = useMemo(() => ({ user, status, refreshStatus, logout }), [user, status, refreshStatus, logout]);
+  const deleteAccount = useCallback(async () => {
+    const response = await apiFetch(`${API_BASE}/api/auth/account`, { method: "DELETE" });
+    if (!response.ok) {
+      const body: unknown = await response.json();
+      throw new Error(messageFrom(response, body));
+    }
+    setSessionToken(null);
+    clearAppDataCache();
+    setUser(null);
+    await refreshStatus();
+  }, [refreshStatus]);
+
+  const context = useMemo(() => ({ user, status, refreshStatus, logout, deleteAccount }), [user, status, refreshStatus, logout, deleteAccount]);
   const isAccountMode = Boolean(status && (status.multi_user_enabled || status.account_count === 0 || (status.account_count > 0 && !user)));
 
   if (bootError) {
@@ -108,26 +128,36 @@ export default function AuthGate({ children }: { children: ReactNode }) {
   if (!status) return <main className="auth-screen"><section className="auth-card"><p>{translate("جارٍ الاتصال بالخادم...", language)}</p></section></main>;
   if (isAccountMode && !user) {
     return <main className="auth-screen" dir={language === "ar" ? "rtl" : "ltr"}>
+      <div className="auth-backdrop-mark" aria-hidden="true">
+        <Workflow />
+        <span>من الفكرة إلى الإنجاز</span>
+      </div>
+      <GlassAppearanceControl language={language} placement="auth" />
       <section className="auth-card">
-        <div className="auth-language">
-          <button type="button" className={language === "ar" ? "active" : ""} onClick={() => saveLanguage("ar")}>العربية</button>
-          <button type="button" className={language === "en" ? "active" : ""} onClick={() => saveLanguage("en")}>English</button>
+        <div className="auth-card-heading">
+          <div className="auth-brand-mark"><Workflow size={25} aria-hidden="true" /></div>
+          <div className="auth-language" aria-label={translate("لغة الواجهة", language)}>
+            <button type="button" className={language === "ar" ? "active" : ""} onClick={() => saveLanguage("ar")}>العربية</button>
+            <button type="button" className={language === "en" ? "active" : ""} onClick={() => saveLanguage("en")}>English</button>
+          </div>
         </div>
-        <span className="auth-brand">OPENFILM-AI TASKFLOW EDITION</span>
-        <h1>{creating ? translate("إنشاء حساب", language) : translate("تسجيل الدخول", language)}</h1>
+        <span className="auth-brand">AI TASKFLOW</span>
+        <h1>{creating ? translate("إنشاء حساب", language) : translate("ابدأ مساحة عملك", language)}</h1>
         <p>{status.account_count === 0
-          ? translate("أول حساب على هذا الجهاز يصبح المسؤول.", language)
-          : translate("بيانات كل حساب محفوظة بشكل منفصل.", language)}</p>
+          ? translate("أنشئ حسابك المحلي وابدأ بتحويل أفكارك إلى إنجاز.", language)
+          : translate("سجّل الدخول للعودة إلى مشاريعك ومساحة عملك.", language)}</p>
         <form onSubmit={(event) => void submit(event)}>
           <label><span>{translate("اسم المستخدم", language)}</span><input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" minLength={3} maxLength={32} required /></label>
           <label><span>{translate("كلمة المرور", language)}</span><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={creating ? "new-password" : "current-password"} minLength={12} maxLength={256} required /></label>
           {notice && <p className="auth-notice" role="status">{notice}</p>}
-          <button className="auth-submit" type="submit" disabled={busy}>{busy ? translate("جارٍ التنفيذ...", language) : creating ? translate("إنشاء حساب", language) : translate("دخول", language)}</button>
+          <button className="auth-submit" type="submit" disabled={busy}>{busy ? translate("جارٍ التنفيذ...", language) : creating ? translate("إنشاء حساب", language) : translate("دخول إلى مساحة العمل", language)}</button>
         </form>
         {status.registration_open && <button className="auth-switch" type="button" onClick={() => { setCreating(!creating); setNotice(""); }}>
           {creating ? translate("لديك حساب؟ سجّل الدخول", language) : translate("إنشاء حساب جديد", language)}
         </button>}
-        {status.approval_required && status.account_count > 0 && <small>{translate("قد يتطلب الحساب الجديد موافقة المسؤول.", language)}</small>}
+        <small className="auth-privacy-note">{status.approval_required && status.account_count > 0
+          ? translate("قد يتطلب الحساب الجديد موافقة المسؤول.", language)
+          : translate("بيانات الحساب محفوظة محليًا على هذا الجهاز.", language)}</small>
       </section>
     </main>;
   }
