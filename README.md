@@ -13,6 +13,8 @@ Reusable instructions are shared between the web app and TF CODE through the
 Browse the catalog in either app, add skills to your account, and use them in AI
 chat with the provider selected for that account.
 
+[![Architecture diagram](https://gitdiagram.com/diagram-badge.svg)](https://gitdiagram.com/adam-mahmoud12/ai-workflow?utm_source=readme&utm_medium=badge)
+[![Architecture diagram of adam-mahmoud12/ai-workflow](https://gitdiagram.com/adam-mahmoud12/ai-workflow/diagram.png)](https://gitdiagram.com/adam-mahmoud12/ai-workflow?utm_source=readme&utm_medium=picture)
 ## دليل الاستخدام بالعربية
 
 ### التشغيل لأول مرة
