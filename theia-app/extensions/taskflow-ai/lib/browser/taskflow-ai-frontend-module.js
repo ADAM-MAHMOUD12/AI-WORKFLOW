@@ -8,6 +8,7 @@ import { PreferenceScope } from '@theia/core/lib/common';
 import { ReactToolbarItemImpl } from '@theia/core/lib/browser/shell/tab-bar-toolbar/tab-toolbar-item';
 import { FrontendLanguageModelRegistry, LanguageModelAliasRegistry } from '@theia/ai-core/lib/common';
 import { ToolbarController } from '@theia/toolbar/lib/browser/toolbar-controller';
+import { registerPythonLanguage } from './taskflow-language-compatibility.js';
 import './taskflow-toolbar.css';
 
 const IMAGE_LIMIT = 3;
@@ -838,6 +839,7 @@ let TaskflowAIContribution = class TaskflowAIContribution {
         this.sessionToken = event.data.sessionToken;
         window.taskflowApiBase = this.apiBase;
         window.taskflowSessionToken = this.sessionToken;
+        window.dispatchEvent(new Event('taskflow:platform-initialized'));
         for (const child of this.standaloneWindows) {
             if (child.closed) {
                 this.standaloneWindows.delete(child);
@@ -1518,9 +1520,18 @@ inject(ContextKeyService)(TaskflowReturnToolbarContribution.prototype, 'contextK
 inject(MessageService)(TaskflowReturnToolbarContribution.prototype, 'messageService');
 inject(PreferenceService)(TaskflowReturnToolbarContribution.prototype, 'preferenceService');
 
+class TaskflowLanguageCompatibilityContribution {
+    onStart() {
+        registerPythonLanguage();
+    }
+}
+injectable()(TaskflowLanguageCompatibilityContribution);
+
 export default new ContainerModule(bind => {
     bind(TaskflowAIContribution).toSelf().inSingletonScope();
     bind(FrontendApplicationContribution).toService(TaskflowAIContribution);
     bind(TaskflowReturnToolbarContribution).toSelf().inSingletonScope();
     bind(FrontendApplicationContribution).toService(TaskflowReturnToolbarContribution);
+    bind(TaskflowLanguageCompatibilityContribution).toSelf().inSingletonScope();
+    bind(FrontendApplicationContribution).toService(TaskflowLanguageCompatibilityContribution);
 });

@@ -346,12 +346,6 @@
   font: var(--theia-ui-font-size) var(--theia-ui-font-family);
 }
 
-.taskflow-extension-marketplace-switch-only {
-  height: auto;
-  padding: 6px 10px;
-  overflow: visible;
-}
-
 .taskflow-extension-source-select {
   display: grid;
   min-width: 0;
@@ -406,7 +400,23 @@
 }
 
 .taskflow-extension-marketplace .taskflow-store-card button {
-  min-height: 40px;
+  min-height: 44px;
+}
+
+.taskflow-extension-marketplace .taskflow-store-card a:focus-visible,
+.taskflow-extension-search button:focus-visible,
+.taskflow-extension-marketplace > button:focus-visible {
+  outline: 2px solid var(--theia-focusBorder);
+  outline-offset: 2px;
+}
+
+.taskflow-extension-compatibility-badge {
+  width: fit-content;
+  padding: 3px 8px;
+  color: var(--theia-button-foreground, var(--theia-ui-foreground));
+  border: 1px solid var(--theia-focusBorder);
+  border-radius: 999px;
+  font-size: 12px;
 }
 
 .taskflow-theme-settings-page {

@@ -27,13 +27,19 @@ W2M's Design Studio can download a pinned, quantized [Florence-2-base-ft ONNX mo
 
 ## Programming workspace
 
-The Programming page keeps project source files in the browser's local storage. AI suggestions are presented for review before the user applies them. Suggested shell commands never run automatically: each run prompts for explicit confirmation in the interface, and the backend accepts command requests only from a loopback connection. In multi-user mode only the host administrator can run commands. Commands run without elevation as the backend's current operating-system account, from an owner-scoped project directory, with a 60-second timeout and bounded output. The working directory is **not** an operating-system sandbox: a shell command may still read or change other files accessible to that account. Run only commands you understand and trust. The endpoint is not suitable for an internet-facing deployment or an untrusted multi-user host.
+The Programming page keeps project source files in the browser's local storage and opens the project in VS Code. Its chat asks the configured AI provider for a standard `taskflow-actions` JSON block containing supported code actions such as `code.write_file`, `code.open_file`, and `code.run_command`. The web app and VS Code extension validate each action and workspace-relative path before presenting it; review is the default, and automatic execution is an explicit user-selected mode. The provider creates the proposed source files; TaskFlow does not use a custom programming language or compiler.
+
+TF CODE displays each chat's steps inside that message, including discussion, proposed files, commands, live terminal output, exit codes, and final results. Terminal actions accept PowerShell and CMD on Windows, plus Bash for Bash-specific commands. If VS Code shell integration is unavailable, the bridge falls back to a captured process so command output and the exit code remain verifiable.
+
+Terminal commands run without elevation as the VS Code user's operating-system account. The working directory is **not** an operating-system sandbox: a command may still read or change other files accessible to that account. Run only commands you understand and trust. Do not expose the local editor bridge to an internet-facing deployment or an untrusted multi-user host.
 
 The project preview runs HTML in a sandboxed iframe and renders Markdown locally. Other languages require an installed runtime and a user-approved local command. Open-source tool cards link to their upstream repositories and only prepare an install command for review; they do not install dependencies without approval.
 
 ## Accounts and data isolation
 
 Registration, login, logout, current-user, account deletion, administrator settings, and account approval are exposed under `/api/auth`. The first registered account becomes the host administrator. Passwords are stored as salted PBKDF2-HMAC-SHA256 hashes; random session tokens are only stored as hashes. New accounts can remain pending until the administrator approves them. Administrators can block non-admin accounts with a note shown at sign-in, revoke their sessions, unblock them, or permanently delete them. Account deletion removes account-scoped data and credentials. The last administrator cannot delete their own account while other accounts remain.
+
+The browser can keep multiple approved account sessions locally and switch the active account through Settings or the sign-in screen. Removing an account removes only the local saved session and does not delete server data. Permanent deletion uses the authenticated account session and removes the account, providers, app data, GitHub and Telegram links, and sessions owned by that account.
 
 When multi-user mode is enabled, app-data rows and AI providers are scoped to the authenticated user. Clients cannot select another user's ID. Existing pre-account records and provider entries are preserved for host administrator access after migration. SQLite is the default database at `backend/data/taskflow.db`; PostgreSQL can be selected with `TASKFLOW_DATABASE_URL`.
 
@@ -45,7 +51,7 @@ The 2D and 3D editor services do not implement public multi-tenant authenticatio
 
 GitHub sign-in uses the OAuth device flow so the desktop/local app never embeds or asks end users for an OAuth client secret. Register one GitHub OAuth App for the TaskFlow host, enable **Device Flow** in its settings, then set `TASKFLOW_GITHUB_CLIENT_ID` in `backend/.env` and restart the backend. The Client ID is public; no client secret is needed for this flow.
 
-Users can then choose **Continue with GitHub** on the TaskFlow sign-in screen. New GitHub identities create TaskFlow accounts subject to the host's account and approval settings. GitHub identities are never automatically attached to an existing TaskFlow account by matching email; sign in to that account and link GitHub once in TaskFlow settings. TF CODE uses that saved link to list accessible repositories and clone a selected repository into its own local workspace. The Source Control panel shows live Git status, lets users stage or unstage selected files, create commits with a configurable title, description, author and email, and push commits to GitHub. Push requires confirmation and GitHub write permission. Login requests `read:user`; account linking requests `repo read:user` to prepare repository access. The `repo` scope can modify repositories, so review GitHub's consent screen before approving. The encrypted GitHub access token is stored server-side and is never returned to the browser or written into the cloned repository's remote URL.
+Users can then choose **Continue with GitHub** on the TaskFlow sign-in screen. New GitHub identities create TaskFlow accounts subject to the host's account and approval settings. GitHub identities are never automatically attached to an existing TaskFlow account by matching email; sign in to that account and link GitHub once in TaskFlow settings. Programming workspaces are local folders opened by the installed Microsoft VS Code app. GitHub repository list/clone and Git stage/commit/push APIs remain authenticated backend operations; pushes require confirmation and GitHub write permission. Login requests `read:user`; account linking requests `repo read:user` to prepare repository access. The `repo` scope can modify repositories, so review GitHub's consent screen before approving. The encrypted GitHub access token is stored server-side and is never returned to the browser or written into a cloned repository's remote URL.
 
 ## API areas
 
@@ -58,14 +64,14 @@ Users can then choose **Continue with GitHub** on the TaskFlow sign-in screen. N
 - `POST /api/chat`, `POST /api/chat/stream`, `POST /api/search`
 - `GET /api/w2m/vision/status`, `POST /api/w2m/vision/download`, `POST /api/w2m/vision/analyze`
 - `GET /api/downloads/{download_id}` for local model download progress
-- `POST /api/programming/run` for user-approved local CMD/PowerShell commands
+- `POST /api/programming/run` for user-approved local CMD/PowerShell commands; commands execute with the backend process privileges, so review each command before approval.
 - Motion Graphics/OpenFilm and architectural editor integration routes
 
 AI provider keys are encrypted at rest; provider-list responses do not expose the key. Requests to external AI services use the endpoint and credentials configured by the account owner. Keep `.env` private, use only trusted provider URLs, and do not configure public-facing custom endpoints without SSRF/network controls and proper authentication.
 
 ## Shared AI skills
 
-The public `AI-TASKFLO-SKILLS` catalog is shared by the TaskFlow web app and TF CODE. Adding one of these skills from either interface saves it to the signed-in account's `skills` app-data record; TF CODE also installs it under `.agents/skills/` in the open workspace. Account skills added in the web app can be copied into an IDE workspace from the same library panel. AI Chat includes saved skill instructions in requests to the account's selected provider.
+The public `AI-TASKFLO-SKILLS` catalog is shared by the TaskFlow web app and its TF CODE agent mode. Adding a skill saves it to the signed-in account's `skills` app-data record. AI Chat includes selected skill instructions in requests to the account's chosen provider, including TF CODE agent requests.
 
 ![Shared skills flow between AI TaskFlow and TF CODE](https://raw.githubusercontent.com/ADAM-MAHMOUD12/AI-TASKFLO-SKILLS/main/docs/shared-library.svg)
 

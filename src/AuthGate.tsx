@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { API_BASE, apiFetch, getSessionToken, setSessionToken } from "./api";
+import {
+  API_BASE,
+  apiFetch,
+  getSavedAccounts,
+  getSessionToken,
+  removeSavedAccount,
+  saveSavedAccount,
+  setSessionToken,
+  type SavedAuthAccount,
+} from "./api";
 import { clearAppDataCache } from "./appData";
 import { Workflow } from "lucide-react";
 import { saveLanguage, translate, useLanguage } from "./localization";
@@ -49,7 +58,19 @@ export default function AuthGate({ children }: { children: ReactNode }) {
           const current = await apiFetch(`${API_BASE}/api/auth/me`);
           if (current.ok) {
             const result = await current.json() as { user: AuthUser };
-            if (active) setUser(result.user);
+            if (active) {
+              setUser(result.user);
+              saveSavedAccount({
+                id: result.user.id,
+                username: result.user.username,
+                role: result.user.role,
+                status: result.user.status,
+                is_blocked: result.user.is_blocked,
+                block_note: result.user.block_note,
+                created_at: result.user.created_at,
+                token,
+              });
+            }
           } else {
             setSessionToken(null);
           }
@@ -78,6 +99,16 @@ export default function AuthGate({ children }: { children: ReactNode }) {
         clearAppDataCache();
         setSessionToken(result.access_token);
         setUser(result.user);
+        saveSavedAccount({
+          id: result.user.id,
+          username: result.user.username,
+          role: result.user.role,
+          status: result.user.status,
+          is_blocked: result.user.is_blocked,
+          block_note: result.user.block_note,
+          created_at: result.user.created_at,
+          token: result.access_token,
+        });
         await refreshStatus();
         setPassword("");
       } else {
@@ -111,13 +142,112 @@ export default function AuthGate({ children }: { children: ReactNode }) {
       const body: unknown = await response.json();
       throw new Error(messageFrom(response, body));
     }
+    const currentUserId = user?.id;
+    if (currentUserId) removeSavedAccount(currentUserId);
     setSessionToken(null);
     clearAppDataCache();
     setUser(null);
     await refreshStatus();
-  }, [refreshStatus]);
+  }, [refreshStatus, user]);
 
-  const context = useMemo(() => ({ user, status, refreshStatus, logout, deleteAccount }), [user, status, refreshStatus, logout, deleteAccount]);
+  const switchAccount = useCallback(async (accountId: string) => {
+    const account = getSavedAccounts().find((item) => item.id === accountId);
+    if (!account) throw new Error("هذا الحساب لم يعد محفوظًا على هذا الجهاز.");
+    const response = await fetch(`${API_BASE}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${account.token}` },
+    });
+    if (!response.ok) {
+      removeSavedAccount(accountId);
+      throw new Error("جلسة الحساب لم تعد صالحة. أضفه مجددًا باسم المستخدم وكلمة المرور.");
+    }
+    const result = await response.json() as { user: AuthUser };
+    setSessionToken(account.token);
+    clearAppDataCache();
+    setUser(result.user);
+    saveSavedAccount({ ...account, ...result.user, token: account.token });
+    window.location.reload();
+  }, []);
+
+  const addAccount = useCallback(async (username: string, password: string) => {
+    const response = await fetch(`${API_BASE}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+    const result = await response.json() as { detail?: string; access_token?: string; user?: AuthUser };
+    if (!response.ok) throw new Error(messageFrom(response, result));
+    if (!result.access_token || !result.user) throw new Error("استجابة تسجيل الحساب البديل غير مكتملة.");
+    const account: SavedAuthAccount = {
+      id: result.user.id,
+      username: result.user.username,
+      role: result.user.role,
+      status: result.user.status,
+      is_blocked: result.user.is_blocked,
+      block_note: result.user.block_note,
+      created_at: result.user.created_at,
+      token: result.access_token,
+    };
+    setSessionToken(result.access_token);
+    clearAppDataCache();
+    setUser(result.user);
+    saveSavedAccount(account);
+    window.location.reload();
+  }, []);
+
+  const removeSavedAccountOnly = useCallback(async (accountId: string) => {
+    const account = getSavedAccounts().find((item) => item.id === accountId);
+    if (!account) return;
+    if (accountId === user?.id) {
+      await logout();
+      removeSavedAccount(accountId);
+      return;
+    }
+    try {
+      await fetch(`${API_BASE}/api/auth/logout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${account.token}` },
+      });
+    } finally {
+      removeSavedAccount(accountId);
+    }
+  }, [logout, user]);
+
+  const deleteSavedAccount = useCallback(async (accountId: string) => {
+    const account = getSavedAccounts().find((item) => item.id === accountId);
+    if (!account) throw new Error("هذا الحساب غير موجود في الحسابات المحفوظة.");
+    if (accountId === user?.id) {
+      await deleteAccount();
+      return;
+    }
+
+    const currentToken = getSessionToken();
+    const currentUser = user;
+    setSessionToken(account.token);
+    const response = await fetch(`${API_BASE}/api/auth/account`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${account.token}` },
+    });
+    if (currentToken) {
+      setSessionToken(currentToken);
+      setUser(currentUser);
+    } else {
+      setSessionToken(null);
+      setUser(null);
+    }
+    if (!response.ok) {
+      const body: unknown = await response.json();
+      throw new Error(messageFrom(response, body));
+    }
+    removeSavedAccount(accountId);
+    clearAppDataCache();
+    await refreshStatus();
+  }, [deleteAccount, refreshStatus, user]);
+
+  const context = useMemo(() => ({
+    user, status, refreshStatus, logout, deleteAccount,
+    switchAccount, addAccount, removeSavedAccount: removeSavedAccountOnly,
+    deleteSavedAccount,
+  }), [user, status, refreshStatus, logout, deleteAccount, switchAccount, addAccount, removeSavedAccountOnly, deleteSavedAccount]);
   const isAccountMode = Boolean(status && (status.multi_user_enabled || status.account_count === 0 || (status.account_count > 0 && !user)));
 
   if (bootError) {
@@ -146,6 +276,18 @@ export default function AuthGate({ children }: { children: ReactNode }) {
         <p>{status.account_count === 0
           ? translate("أنشئ حسابك المحلي وابدأ بتحويل أفكارك إلى إنجاز.", language)
           : translate("سجّل الدخول للعودة إلى مشاريعك ومساحة عملك.", language)}</p>
+        {!creating && getSavedAccounts().length > 0 && <div className="auth-saved-accounts">
+          <div className="auth-saved-accounts-heading"><strong>{translate("الحسابات المحفوظة", language)}</strong><small>{translate("بدّل الحساب دون إدخال كلمة المرور مجددًا", language)}</small></div>
+          {getSavedAccounts().map((account) => <button
+            type="button"
+            key={account.id}
+            disabled={busy}
+            onClick={() => void switchAccount(account.id)}
+          >
+            <span>{account.username}</span>
+            <small>{account.role === "admin" ? translate("مسؤول", language) : translate("مستخدم", language)}</small>
+          </button>)}
+        </div>}
         <form onSubmit={(event) => void submit(event)}>
           <label><span>{translate("اسم المستخدم", language)}</span><input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" minLength={3} maxLength={32} required /></label>
           <label><span>{translate("كلمة المرور", language)}</span><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={creating ? "new-password" : "current-password"} minLength={12} maxLength={256} required /></label>

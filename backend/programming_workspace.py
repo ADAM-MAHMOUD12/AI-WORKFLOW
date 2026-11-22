@@ -1,13 +1,19 @@
 from __future__ import annotations
 
 import base64
+import ctypes
 import hashlib
+import json
 import os
+import platform
 import re
 import shutil
 import subprocess
 import tempfile
 import time
+import urllib.error
+import urllib.request
+import zipfile
 from pathlib import Path
 from typing import Literal
 from urllib.parse import urlparse
@@ -17,6 +23,17 @@ from fastapi import HTTPException
 
 WORKSPACE_ROOT = Path(__file__).resolve().parent / "data" / "programming-workspaces"
 PROJECT_ID_PATTERN = re.compile(r"^[a-f0-9]{32}$")
+VSCODE_INSTALLER_URLS = {
+    "AMD64": "https://update.code.visualstudio.com/latest/win32-x64-user/stable",
+    "ARM64": "https://update.code.visualstudio.com/latest/win32-arm64-user/stable",
+    "x86": "https://update.code.visualstudio.com/latest/win32-ia32-user/stable",
+}
+VSCODE_EXTENSION_ID = "taskflow.taskflow-vscode-bridge"
+VSCODE_BRIDGE_PORT_START = 17391
+VSCODE_BRIDGE_PORT_END = 17410
+VSCODE_BRIDGE_START_TIMEOUT_SECONDS = 60
+VSCODE_INSTALLER_MAX_BYTES = 200 * 1024 * 1024
+VSCODE_INSTALLER_TIMEOUT_SECONDS = 900
 MAX_FILES = 60
 MAX_FILE_BYTES = 1_000_000
 MAX_TOTAL_BYTES = 5_000_000
@@ -67,6 +84,621 @@ def _project_directory(owner_id: str | None, project_id: str) -> Path:
     if project_directory.is_symlink():
         raise HTTPException(status_code=400, detail="The programming project path is invalid.")
     return project_directory
+
+
+def _find_vscode_executable() -> Path | None:
+    candidates: list[Path] = []
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if local_app_data:
+        candidates.append(Path(local_app_data) / "Programs" / "Microsoft VS Code" / "Code.exe")
+    for variable in ("ProgramFiles", "ProgramFiles(x86)"):
+        program_files = os.environ.get(variable)
+        if program_files:
+            candidates.append(Path(program_files) / "Microsoft VS Code" / "Code.exe")
+
+    code_command = shutil.which("code")
+    if code_command:
+        command_path = Path(code_command)
+        candidates.append(command_path.parent.parent / "Code.exe")
+        if command_path.suffix.lower() == ".exe":
+            candidates.append(command_path)
+
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate.resolve()
+    return None
+
+
+def _vscode_instance_matches_current_session(executable: Path) -> bool:
+    if os.name != "nt":
+        return False
+
+    from ctypes import wintypes
+
+    class ProcessEntry32W(ctypes.Structure):
+        _fields_ = [
+            ("dwSize", wintypes.DWORD),
+            ("cntUsage", wintypes.DWORD),
+            ("th32ProcessID", wintypes.DWORD),
+            ("th32DefaultHeapID", ctypes.POINTER(ctypes.c_ulong)),
+            ("th32ModuleID", wintypes.DWORD),
+            ("cntThreads", wintypes.DWORD),
+            ("th32ParentProcessID", wintypes.DWORD),
+            ("pcPriClassBase", ctypes.c_long),
+            ("dwFlags", wintypes.DWORD),
+            ("szExeFile", wintypes.WCHAR * 260),
+        ]
+
+    class TokenElevation(ctypes.Structure):
+        _fields_ = [("TokenIsElevated", wintypes.DWORD)]
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    advapi32 = ctypes.WinDLL("advapi32", use_last_error=True)
+    kernel32.CreateToolhelp32Snapshot.argtypes = [wintypes.DWORD, wintypes.DWORD]
+    kernel32.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
+    kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel32.CloseHandle.restype = wintypes.BOOL
+    kernel32.Process32FirstW.argtypes = [wintypes.HANDLE, ctypes.POINTER(ProcessEntry32W)]
+    kernel32.Process32FirstW.restype = wintypes.BOOL
+    kernel32.Process32NextW.argtypes = [wintypes.HANDLE, ctypes.POINTER(ProcessEntry32W)]
+    kernel32.Process32NextW.restype = wintypes.BOOL
+    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.ProcessIdToSessionId.argtypes = [wintypes.DWORD, ctypes.POINTER(wintypes.DWORD)]
+    kernel32.ProcessIdToSessionId.restype = wintypes.BOOL
+    kernel32.QueryFullProcessImageNameW.argtypes = [
+        wintypes.HANDLE, wintypes.DWORD, wintypes.LPWSTR, ctypes.POINTER(wintypes.DWORD),
+    ]
+    kernel32.QueryFullProcessImageNameW.restype = wintypes.BOOL
+    advapi32.OpenProcessToken.argtypes = [wintypes.HANDLE, wintypes.DWORD, ctypes.POINTER(wintypes.HANDLE)]
+    advapi32.OpenProcessToken.restype = wintypes.BOOL
+    advapi32.GetTokenInformation.argtypes = [
+        wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD),
+    ]
+    advapi32.GetTokenInformation.restype = wintypes.BOOL
+
+    def token_is_elevated(token: wintypes.HANDLE) -> bool | None:
+        elevation = TokenElevation()
+        returned_size = wintypes.DWORD()
+        if not advapi32.GetTokenInformation(
+            token, 20, ctypes.byref(elevation), ctypes.sizeof(elevation), ctypes.byref(returned_size),
+        ):
+            return None
+        return bool(elevation.TokenIsElevated)
+
+    current_token = wintypes.HANDLE()
+    if not advapi32.OpenProcessToken(
+        kernel32.GetCurrentProcess(), 0x0008, ctypes.byref(current_token),
+    ):
+        return False
+    try:
+        current_elevation = token_is_elevated(current_token)
+    finally:
+        kernel32.CloseHandle(current_token)
+    if current_elevation is None:
+        return False
+
+    current_session = wintypes.DWORD()
+    if not kernel32.ProcessIdToSessionId(os.getpid(), ctypes.byref(current_session)):
+        return False
+
+    snapshot = kernel32.CreateToolhelp32Snapshot(0x00000002, 0)
+    if snapshot == ctypes.c_void_p(-1).value:
+        return False
+    expected_executable = os.path.normcase(os.path.abspath(executable))
+    try:
+        entry = ProcessEntry32W()
+        entry.dwSize = ctypes.sizeof(entry)
+        has_process = kernel32.Process32FirstW(snapshot, ctypes.byref(entry))
+        while has_process:
+            if entry.szExeFile.lower() == "code.exe":
+                process = kernel32.OpenProcess(0x1000, False, entry.th32ProcessID)
+                if process:
+                    try:
+                        session = wintypes.DWORD()
+                        image = ctypes.create_unicode_buffer(32768)
+                        image_size = wintypes.DWORD(len(image))
+                        if (
+                            kernel32.ProcessIdToSessionId(entry.th32ProcessID, ctypes.byref(session))
+                            and session.value == current_session.value
+                            and kernel32.QueryFullProcessImageNameW(
+                                process, 0, image, ctypes.byref(image_size),
+                            )
+                            and os.path.normcase(os.path.abspath(image.value)) == expected_executable
+                        ):
+                            process_token = wintypes.HANDLE()
+                            if advapi32.OpenProcessToken(process, 0x0008, ctypes.byref(process_token)):
+                                try:
+                                    if token_is_elevated(process_token) == current_elevation:
+                                        return True
+                                finally:
+                                    kernel32.CloseHandle(process_token)
+                    finally:
+                        kernel32.CloseHandle(process)
+            has_process = kernel32.Process32NextW(snapshot, ctypes.byref(entry))
+    finally:
+        kernel32.CloseHandle(snapshot)
+    return False
+
+
+def _run_as_interactive_user(
+    executable: Path,
+    arguments: list[str],
+    working_directory: Path,
+    timeout: int,
+    wait: bool = True,
+) -> int | None:
+    if os.name != "nt":
+        raise HTTPException(status_code=501, detail="Launching desktop applications is supported on Windows only.")
+    command = [str(executable), *arguments]
+    if not ctypes.windll.shell32.IsUserAnAdmin():
+        try:
+            if wait:
+                result = subprocess.run(
+                    command,
+                    stdin=subprocess.DEVNULL,
+                    cwd=str(working_directory),
+                    timeout=timeout,
+                    check=False,
+                )
+                return result.returncode
+            subprocess.Popen(
+                command,
+                stdin=subprocess.DEVNULL,
+                cwd=str(working_directory),
+                close_fds=True,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+            return None
+        except subprocess.TimeoutExpired:
+            raise
+        except OSError as exc:
+            raise HTTPException(status_code=503, detail=f"Could not launch {executable.name}: {exc}") from exc
+
+    from ctypes import wintypes
+
+    class StartupInfoW(ctypes.Structure):
+        _fields_ = [
+            ("cb", wintypes.DWORD),
+            ("lpReserved", wintypes.LPWSTR),
+            ("lpDesktop", wintypes.LPWSTR),
+            ("lpTitle", wintypes.LPWSTR),
+            ("dwX", wintypes.DWORD),
+            ("dwY", wintypes.DWORD),
+            ("dwXSize", wintypes.DWORD),
+            ("dwYSize", wintypes.DWORD),
+            ("dwXCountChars", wintypes.DWORD),
+            ("dwYCountChars", wintypes.DWORD),
+            ("dwFillAttribute", wintypes.DWORD),
+            ("dwFlags", wintypes.DWORD),
+            ("wShowWindow", wintypes.WORD),
+            ("cbReserved2", wintypes.WORD),
+            ("lpReserved2", ctypes.POINTER(ctypes.c_ubyte)),
+            ("hStdInput", wintypes.HANDLE),
+            ("hStdOutput", wintypes.HANDLE),
+            ("hStdError", wintypes.HANDLE),
+        ]
+
+    class ProcessInformation(ctypes.Structure):
+        _fields_ = [
+            ("hProcess", wintypes.HANDLE),
+            ("hThread", wintypes.HANDLE),
+            ("dwProcessId", wintypes.DWORD),
+            ("dwThreadId", wintypes.DWORD),
+        ]
+
+    class SidAndAttributes(ctypes.Structure):
+        _fields_ = [("sid", ctypes.c_void_p), ("attributes", wintypes.DWORD)]
+
+    class TokenIntegrityLevel(ctypes.Structure):
+        _fields_ = [("label", SidAndAttributes)]
+
+    class Luid(ctypes.Structure):
+        _fields_ = [("low_part", wintypes.DWORD), ("high_part", ctypes.c_long)]
+
+    class LuidAndAttributes(ctypes.Structure):
+        _fields_ = [("luid", Luid), ("attributes", wintypes.DWORD)]
+
+    class TokenPrivileges(ctypes.Structure):
+        _fields_ = [("count", wintypes.DWORD), ("privileges", LuidAndAttributes * 2)]
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    advapi32 = ctypes.WinDLL("advapi32", use_last_error=True)
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel32.CloseHandle.restype = wintypes.BOOL
+    kernel32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+    kernel32.WaitForSingleObject.restype = wintypes.DWORD
+    kernel32.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+    kernel32.GetExitCodeProcess.restype = wintypes.BOOL
+    kernel32.TerminateProcess.argtypes = [wintypes.HANDLE, wintypes.UINT]
+    kernel32.TerminateProcess.restype = wintypes.BOOL
+    kernel32.LocalFree.argtypes = [wintypes.HLOCAL]
+    kernel32.LocalFree.restype = wintypes.HLOCAL
+    advapi32.ConvertStringSidToSidW.argtypes = [wintypes.LPCWSTR, ctypes.POINTER(ctypes.c_void_p)]
+    advapi32.ConvertStringSidToSidW.restype = wintypes.BOOL
+    advapi32.CreateRestrictedToken.argtypes = [
+        wintypes.HANDLE, wintypes.DWORD, wintypes.DWORD, ctypes.POINTER(SidAndAttributes),
+        wintypes.DWORD, ctypes.c_void_p, wintypes.DWORD, ctypes.c_void_p,
+        ctypes.POINTER(wintypes.HANDLE),
+    ]
+    advapi32.CreateRestrictedToken.restype = wintypes.BOOL
+    advapi32.DuplicateTokenEx.argtypes = [
+        wintypes.HANDLE, wintypes.DWORD, ctypes.c_void_p, ctypes.c_int,
+        ctypes.c_int, ctypes.POINTER(wintypes.HANDLE),
+    ]
+    advapi32.DuplicateTokenEx.restype = wintypes.BOOL
+    advapi32.SetTokenInformation.argtypes = [
+        wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD,
+    ]
+    advapi32.SetTokenInformation.restype = wintypes.BOOL
+    advapi32.GetLengthSid.argtypes = [ctypes.c_void_p]
+    advapi32.GetLengthSid.restype = wintypes.DWORD
+    advapi32.OpenProcessToken.argtypes = [wintypes.HANDLE, wintypes.DWORD, ctypes.POINTER(wintypes.HANDLE)]
+    advapi32.OpenProcessToken.restype = wintypes.BOOL
+    advapi32.LookupPrivilegeValueW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR, ctypes.POINTER(Luid)]
+    advapi32.LookupPrivilegeValueW.restype = wintypes.BOOL
+    advapi32.AdjustTokenPrivileges.argtypes = [
+        wintypes.HANDLE, wintypes.BOOL, ctypes.POINTER(TokenPrivileges), wintypes.DWORD,
+        ctypes.POINTER(TokenPrivileges), ctypes.POINTER(wintypes.DWORD),
+    ]
+    advapi32.AdjustTokenPrivileges.restype = wintypes.BOOL
+    advapi32.CreateProcessWithTokenW.argtypes = [
+        wintypes.HANDLE, wintypes.DWORD, wintypes.LPCWSTR, wintypes.LPWSTR,
+        wintypes.DWORD, ctypes.c_void_p, wintypes.LPCWSTR,
+        ctypes.POINTER(StartupInfoW), ctypes.POINTER(ProcessInformation),
+    ]
+    advapi32.CreateProcessWithTokenW.restype = wintypes.BOOL
+    advapi32.CreateProcessAsUserW.argtypes = [
+        wintypes.HANDLE, wintypes.LPCWSTR, wintypes.LPWSTR, ctypes.c_void_p,
+        ctypes.c_void_p, wintypes.BOOL, wintypes.DWORD, ctypes.c_void_p,
+        wintypes.LPCWSTR, ctypes.POINTER(StartupInfoW), ctypes.POINTER(ProcessInformation),
+    ]
+    advapi32.CreateProcessAsUserW.restype = wintypes.BOOL
+
+    def close(handle):
+        if handle:
+            kernel32.CloseHandle(handle)
+
+    current_token = wintypes.HANDLE()
+    restricted_token = wintypes.HANDLE()
+    primary_token = wintypes.HANDLE()
+    child_process = ProcessInformation()
+    administrators_sid = ctypes.c_void_p()
+    local_admin_sid = ctypes.c_void_p()
+    medium_integrity_sid = ctypes.c_void_p()
+    try:
+        if not advapi32.ConvertStringSidToSidW("S-1-5-32-544", ctypes.byref(administrators_sid)):
+            raise HTTPException(status_code=503, detail="Could not identify the Windows administrators group.")
+        if not advapi32.ConvertStringSidToSidW("S-1-5-114", ctypes.byref(local_admin_sid)):
+            raise HTTPException(status_code=503, detail="Could not identify the Windows local-administrator group.")
+        if not advapi32.ConvertStringSidToSidW("S-1-16-8192", ctypes.byref(medium_integrity_sid)):
+            raise HTTPException(status_code=503, detail="Could not prepare standard-user process integrity.")
+        if not advapi32.OpenProcessToken(kernel32.GetCurrentProcess(), 0x0002 | 0x0008 | 0x0020 | 0x0080, ctypes.byref(current_token)):
+            raise HTTPException(status_code=503, detail="Could not inspect the current Windows user account.")
+
+        disabled_sids = (SidAndAttributes * 2)(
+            SidAndAttributes(administrators_sid, 0),
+            SidAndAttributes(local_admin_sid, 0),
+        )
+        if not advapi32.CreateRestrictedToken(
+            current_token, 0x00000001, 2, disabled_sids,
+            0, None, 0, None, ctypes.byref(restricted_token),
+        ):
+            raise HTTPException(status_code=503, detail="Could not create a restricted user token; refusing to run VS Code with administrator privileges.")
+        integrity_label = TokenIntegrityLevel(SidAndAttributes(medium_integrity_sid, 0x00000020))
+        integrity_size = ctypes.sizeof(integrity_label) + advapi32.GetLengthSid(medium_integrity_sid)
+        if not advapi32.SetTokenInformation(restricted_token, 25, ctypes.byref(integrity_label), integrity_size):
+            raise HTTPException(status_code=503, detail="Could not lower VS Code to standard-user integrity.")
+        if not advapi32.DuplicateTokenEx(restricted_token, 0x0000000B, None, 2, 1, ctypes.byref(primary_token)):
+            raise HTTPException(status_code=503, detail="Could not prepare the restricted Windows process token.")
+
+        command_line = ctypes.create_unicode_buffer(subprocess.list2cmdline(command))
+        startup_info = StartupInfoW()
+        startup_info.cb = ctypes.sizeof(startup_info)
+        startup_info.lpDesktop = "winsta0\\default"
+        creation_flags = 0x00000008 if not wait else 0
+        created = advapi32.CreateProcessWithTokenW(
+            primary_token, 0, str(executable), command_line, creation_flags,
+            None, str(working_directory), ctypes.byref(startup_info), ctypes.byref(child_process),
+        )
+        error = ctypes.get_last_error() if not created else 0
+        if not created:
+            enabled_privileges = TokenPrivileges()
+            enabled_privileges.count = 2
+            for index, name in enumerate(("SeIncreaseQuotaPrivilege", "SeAssignPrimaryTokenPrivilege")):
+                if not advapi32.LookupPrivilegeValueW(None, name, ctypes.byref(enabled_privileges.privileges[index].luid)):
+                    raise HTTPException(status_code=503, detail=f"Could not prepare the Windows {name} privilege.")
+                enabled_privileges.privileges[index].attributes = 0x00000002
+            previous_privileges = TokenPrivileges()
+            previous_size = wintypes.DWORD(ctypes.sizeof(previous_privileges))
+            ctypes.set_last_error(0)
+            if not advapi32.AdjustTokenPrivileges(
+                current_token, False, ctypes.byref(enabled_privileges), previous_size.value,
+                ctypes.byref(previous_privileges), ctypes.byref(previous_size),
+            ) or ctypes.get_last_error() == 1300:
+                raise HTTPException(status_code=503, detail="Could not enable the temporary Windows process-launch privileges.")
+            created = advapi32.CreateProcessAsUserW(
+                primary_token,
+                str(executable),
+                command_line,
+                None,
+                None,
+                False,
+                creation_flags,
+                None,
+                str(working_directory),
+                ctypes.byref(startup_info),
+                ctypes.byref(child_process),
+            )
+            error = ctypes.get_last_error() if not created else 0
+            advapi32.AdjustTokenPrivileges(
+                current_token, False, ctypes.byref(previous_privileges), 0, None, None,
+            )
+        if not created:
+            raise HTTPException(status_code=503, detail=f"Could not launch VS Code setup as the current non-elevated user (Windows error {error}).")
+
+        close(child_process.hThread)
+        child_process.hThread = None
+        if not wait:
+            return None
+
+        wait_result = kernel32.WaitForSingleObject(child_process.hProcess, timeout * 1000)
+        if wait_result == 0x00000102:
+            kernel32.TerminateProcess(child_process.hProcess, 1)
+            raise subprocess.TimeoutExpired(str(executable), timeout)
+        if wait_result != 0:
+            raise HTTPException(status_code=503, detail="Could not wait for the VS Code setup process to finish.")
+        exit_code = wintypes.DWORD()
+        if not kernel32.GetExitCodeProcess(child_process.hProcess, ctypes.byref(exit_code)):
+            raise HTTPException(status_code=503, detail="Could not read the VS Code setup result.")
+        return int(exit_code.value)
+    finally:
+        close(child_process.hThread)
+        close(child_process.hProcess)
+        close(primary_token)
+        close(restricted_token)
+        close(current_token)
+        if administrators_sid:
+            kernel32.LocalFree(administrators_sid)
+        if local_admin_sid:
+            kernel32.LocalFree(local_admin_sid)
+        if medium_integrity_sid:
+            kernel32.LocalFree(medium_integrity_sid)
+
+
+def _verify_vscode_installer(installer_path: Path) -> None:
+    powershell = shutil.which("powershell.exe") or shutil.which("powershell")
+    if not powershell:
+        raise HTTPException(status_code=503, detail="PowerShell is required to verify the Microsoft VS Code installer signature.")
+    script = (
+        "$signature = Get-AuthenticodeSignature -LiteralPath $env:TASKFLOW_VSCODE_INSTALLER; "
+        "$signer = if ($signature.SignerCertificate) { $signature.SignerCertificate.Subject } else { '' }; "
+        "@{ status = $signature.Status.ToString(); signer = $signer } | ConvertTo-Json -Compress"
+    )
+    environment = {**os.environ, "TASKFLOW_VSCODE_INSTALLER": str(installer_path)}
+    try:
+        result = subprocess.run(
+            [powershell, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script],
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env=environment,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise HTTPException(status_code=503, detail="Could not verify the downloaded VS Code installer signature.") from exc
+    try:
+        signature = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=502, detail="Microsoft installer signature verification returned an invalid result.") from exc
+    signer = signature.get("signer", "") if isinstance(signature, dict) else ""
+    status = signature.get("status", "") if isinstance(signature, dict) else ""
+    if result.returncode != 0 or status != "Valid" or "Microsoft Corporation" not in signer:
+        raise HTTPException(status_code=502, detail="The downloaded VS Code installer does not have a valid Microsoft Corporation signature.")
+
+
+def _download_vscode_installer(installer_path: Path) -> None:
+    architecture = platform.machine().upper()
+    installer_url = VSCODE_INSTALLER_URLS.get(architecture)
+    if not installer_url:
+        raise HTTPException(status_code=501, detail=f"Automatic VS Code installation is not supported on Windows architecture {architecture or 'unknown'}.")
+    request = urllib.request.Request(
+        installer_url,
+        headers={"User-Agent": "AI-TaskFlow-VSCode-Setup/1.0"},
+    )
+    deadline = time.monotonic() + VSCODE_INSTALLER_TIMEOUT_SECONDS
+    total_bytes = 0
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response, installer_path.open("wb") as installer_file:
+            if not response.geturl().lower().startswith("https://"):
+                raise HTTPException(status_code=502, detail="Microsoft installer download did not remain on HTTPS.")
+            while chunk := response.read(1024 * 1024):
+                if time.monotonic() > deadline:
+                    raise HTTPException(status_code=504, detail="Downloading the VS Code installer timed out.")
+                total_bytes += len(chunk)
+                if total_bytes > VSCODE_INSTALLER_MAX_BYTES:
+                    raise HTTPException(status_code=413, detail="The VS Code installer download exceeded the size limit.")
+                installer_file.write(chunk)
+    except HTTPException:
+        raise
+    except (OSError, TimeoutError) as exc:
+        raise HTTPException(status_code=502, detail=f"Could not download VS Code from Microsoft: {exc}") from exc
+    if total_bytes == 0:
+        raise HTTPException(status_code=502, detail="Microsoft returned an empty VS Code installer.")
+
+
+def _install_vscode_user_setup() -> Path:
+    with tempfile.TemporaryDirectory(prefix="taskflow-vscode-") as temporary_directory:
+        installer_path = Path(temporary_directory) / "VSCodeSetup.exe"
+        _download_vscode_installer(installer_path)
+        _verify_vscode_installer(installer_path)
+        try:
+            exit_code = _run_as_interactive_user(
+                installer_path,
+                ["/VERYSILENT", "/NORESTART", "/MERGETASKS=!runcode"],
+                Path(temporary_directory),
+                VSCODE_INSTALLER_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise HTTPException(status_code=504, detail="Installing Visual Studio Code timed out.") from exc
+        if exit_code != 0:
+            raise HTTPException(status_code=500, detail=f"The VS Code user installer failed with exit code {exit_code}.")
+
+    executable = _find_vscode_executable()
+    if not executable:
+        raise HTTPException(status_code=500, detail="VS Code installer completed, but Code.exe could not be found.")
+    return executable
+
+
+def _find_vscode_cli(executable: Path) -> Path:
+    cli = executable.parent / "bin" / "code.cmd"
+    if cli.is_file():
+        return cli.resolve()
+    cli = executable.parent / "bin" / "code"
+    if cli.is_file():
+        return cli.resolve()
+    return executable
+
+
+def _find_vscode_bridge_port(project_directory: Path) -> int | None:
+    expected_workspace = os.path.normcase(os.path.normpath(str(project_directory)))
+    for port in range(VSCODE_BRIDGE_PORT_START, VSCODE_BRIDGE_PORT_END + 1):
+        try:
+            with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=0.25) as response:
+                if response.status != 200:
+                    continue
+                health = json.loads(response.read(65_537).decode("utf-8"))
+        except (OSError, TimeoutError, urllib.error.URLError, UnicodeDecodeError, json.JSONDecodeError):
+            continue
+        if not isinstance(health, dict) or health.get("running") is not True:
+            continue
+        workspace_directory = health.get("workspace_directory")
+        if (
+            isinstance(workspace_directory, str)
+            and os.path.normcase(os.path.normpath(workspace_directory)) == expected_workspace
+        ):
+            return port
+    return None
+
+
+def _wait_for_vscode_bridge(project_directory: Path) -> int:
+    deadline = time.monotonic() + VSCODE_BRIDGE_START_TIMEOUT_SECONDS
+    while True:
+        port = _find_vscode_bridge_port(project_directory)
+        if port is not None:
+            return port
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise HTTPException(
+                status_code=504,
+                detail=(
+                    "VS Code was opened, but its TF CODE extension did not start. "
+                    "Approve any Workspace Trust prompt, then reload the VS Code window."
+                ),
+            )
+        time.sleep(min(0.5, remaining))
+
+
+def _ensure_vscode_extension(executable: Path, extension_package: Path) -> None:
+    vscode_cli = _find_vscode_cli(executable)
+    try:
+        with zipfile.ZipFile(extension_package) as archive:
+            package_metadata = json.loads(archive.read("extension/package.json").decode("utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, KeyError, zipfile.BadZipFile) as exc:
+        raise HTTPException(status_code=500, detail="The bundled TF CODE extension metadata is unavailable or invalid.") from exc
+    expected_version = package_metadata.get("version") if isinstance(package_metadata, dict) else None
+    if not isinstance(expected_version, str):
+        raise HTTPException(status_code=500, detail="The bundled TF CODE extension version is missing.")
+
+    try:
+        installed = subprocess.run(
+            [str(vscode_cli), "--list-extensions", "--show-versions"],
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise HTTPException(status_code=503, detail="Could not inspect the installed VS Code extensions.") from exc
+    if installed.returncode != 0:
+        raise HTTPException(status_code=500, detail=f"VS Code could not list installed extensions. {(installed.stderr or '').strip()[-1000:]}")
+    extension_line = next(
+        (line.strip() for line in installed.stdout.splitlines()
+         if line.strip().lower().startswith(f"{VSCODE_EXTENSION_ID}@")),
+        "",
+    )
+    installed_version = extension_line.rsplit("@", 1)[-1] if extension_line else ""
+    try:
+        installed_version_tuple = tuple(int(part) for part in installed_version.split("."))
+        expected_version_tuple = tuple(int(part) for part in expected_version.split("."))
+    except ValueError:
+        installed_version_tuple = ()
+        expected_version_tuple = ()
+    if installed_version_tuple and expected_version_tuple and installed_version_tuple >= expected_version_tuple:
+        return
+
+    try:
+        install_exit_code = _run_as_interactive_user(
+            vscode_cli,
+            ["--install-extension", str(extension_package), "--force"],
+            executable.parent,
+            180,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise HTTPException(status_code=503, detail="Could not install the bundled TF CODE VS Code extension.") from exc
+    if install_exit_code != 0:
+        raise HTTPException(status_code=500, detail=f"VS Code failed to install the TF CODE extension with exit code {install_exit_code}.")
+
+
+def launch_vscode_project(owner_id: str | None, project_id: str) -> dict[str, str | bool | int]:
+    if os.name != "nt":
+        raise HTTPException(status_code=501, detail="Automatic VS Code setup is currently supported on Windows only.")
+    project_directory = _project_directory(owner_id, project_id)
+    if not project_directory.is_dir():
+        raise HTTPException(status_code=404, detail="The TF CODE project workspace does not exist.")
+
+    bridge_port = _find_vscode_bridge_port(project_directory)
+    application_root = Path(__file__).resolve().parent.parent
+    extension_package = application_root / "vscode-extension" / "TF-CODE-Agent-Bridge.vsix"
+    if not extension_package.is_file():
+        extension_package = application_root / "release" / "TF-CODE-Agent-Bridge.vsix"
+    if not extension_package.is_file():
+        raise HTTPException(status_code=500, detail="The TF CODE extension package is missing from this installation.")
+    executable = _find_vscode_executable() or _install_vscode_user_setup()
+    if bridge_port is None:
+        _ensure_vscode_extension(executable, extension_package)
+        try:
+            launch_arguments = ["--new-window", str(project_directory)]
+            if _vscode_instance_matches_current_session(executable):
+                subprocess.Popen(
+                    [str(executable), *launch_arguments],
+                    stdin=subprocess.DEVNULL,
+                    cwd=str(project_directory),
+                    close_fds=True,
+                )
+            else:
+                _run_as_interactive_user(
+                    executable,
+                    launch_arguments,
+                    project_directory,
+                    30,
+                    wait=False,
+                )
+        except subprocess.TimeoutExpired as exc:
+            raise HTTPException(status_code=504, detail="Opening the project in VS Code timed out.") from exc
+        except OSError as exc:
+            raise HTTPException(status_code=503, detail=f"Could not open the project in VS Code: {exc}") from exc
+        bridge_port = _wait_for_vscode_bridge(project_directory)
+    return {
+        "launched": True,
+        "vscode_path": str(executable),
+        "workspace_directory": str(project_directory),
+        "extension_id": VSCODE_EXTENSION_ID,
+        "bridge_port": bridge_port,
+    }
 
 
 def _write_project_files(project_directory: Path, files: list[dict[str, str]]) -> None:

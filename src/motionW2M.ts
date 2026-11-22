@@ -247,8 +247,70 @@ function cleanReply(reply: string): string {
     .replace(/^W2M\/2[ \t]+PROJECT(?=\r?\n|$)/i, "W2M/2");
 }
 
+function normalizeSceneNames(source: string): string {
+  const lines = source.split(/\r?\n/);
+  const aliases = new Map<string, string>();
+  const fileAliases = new Map<string, string>();
+  let sceneIndex = 0;
+
+  const addAlias = (alias: string, canonical: string) => {
+    const basename = alias.replace(/^.*[\\/]/, "");
+    const stem = basename.replace(/\.html$/i, "").toLowerCase();
+    if (stem) aliases.set(stem, canonical);
+    if (/\.html$/i.test(basename)) fileAliases.set(basename, canonical);
+  };
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const match = line.match(/^(\s*DO SCENE\s+)(\S+)(?:\s+BEGIN(?:\s+\d+(?:\.\d+)?s)?)?(\s*)$/i);
+    if (!match) continue;
+    sceneIndex += 1;
+    const canonical = `scene-${String(sceneIndex).padStart(2, "0")}.html`;
+    const token = match[2].replace(/^["']|["']$/g, "");
+    const basename = token.replace(/^.*[\\/]/, "");
+    const stem = basename.replace(/\.html$/i, "");
+    addAlias(token, canonical);
+    addAlias(`${stem}.html`, canonical);
+    const numeric = stem.match(/^(?:scene[-_]?)?0*(\d+)$/i)?.[1];
+    if (numeric) {
+      const number = Number(numeric);
+      for (const alias of [
+        `${number}`,
+        `scene${number}`,
+        `scene-${number}`,
+        `scene-${String(number).padStart(2, "0")}`,
+        `scene_${number}`,
+        `scene_${String(number).padStart(2, "0")}`,
+      ]) {
+        addAlias(alias, canonical);
+        addAlias(`${alias}.html`, canonical);
+      }
+    }
+    lines[index] = `${match[1]}${canonical}${match[3]}`;
+  }
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const marker = lines[index].match(/^(\s*HTML\s+)(\S+)(\s+(?:BEGIN|END)\s*)$/i);
+    if (marker) {
+      const basename = marker[2].replace(/^.*[\\/]/, "");
+      const canonical = aliases.get(basename.replace(/\.html$/i, "").toLowerCase());
+      if (canonical) lines[index] = `${marker[1]}${canonical}${marker[3]}`;
+    }
+  }
+
+  let normalized = lines.join("\n");
+  for (const [alias, canonical] of fileAliases) {
+    const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    normalized = normalized.replace(
+      new RegExp(`(^|[^A-Za-z0-9_-])${escaped}(?=$|[^A-Za-z0-9_.-])`, "gi"),
+      (_match, prefix: string) => `${prefix}${canonical}`,
+    );
+  }
+  return normalized;
+}
+
 export function parseW2MProject(reply: string): OpenFilmProject {
-  const source = cleanReply(reply);
+  const source = normalizeSceneNames(cleanReply(reply));
   if (source.length > MAX_PROJECT_SOURCE_SIZE + 100_000) {
     throw diagnostic("W2M001", 1, "رد W2M أكبر من الحد المسموح.");
   }

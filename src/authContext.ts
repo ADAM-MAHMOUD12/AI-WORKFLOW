@@ -28,6 +28,10 @@ export type AuthContextValue = {
   refreshStatus: () => Promise<void>;
   logout: () => Promise<void>;
   deleteAccount: () => Promise<void>;
+  switchAccount: (accountId: string) => Promise<void>;
+  addAccount: (username: string, password: string) => Promise<void>;
+  removeSavedAccount: (accountId: string) => Promise<void>;
+  deleteSavedAccount: (accountId: string) => Promise<void>;
 };
 
 export const AuthContext = createContext<AuthContextValue | null>(null);

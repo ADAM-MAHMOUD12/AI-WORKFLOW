@@ -29,7 +29,14 @@ export type AIAppAction =
   | { type: "provider.set_default"; providerId: string }
   | { type: "settings.update"; compactMode?: boolean; defaultChatMode?: "auto" | "chat" }
   | { type: "workspace.create"; name: string }
-  | { type: "workspace.switch"; id: string };
+  | { type: "workspace.switch"; id: string }
+  | { type: "code.write_file"; path: string; content: string }
+  | { type: "code.delete_file"; path: string }
+  | { type: "code.open_file"; path: string; line?: number }
+  | { type: "code.insert_text"; text: string }
+  | { type: "code.replace_selection"; text: string }
+  | { type: "code.execute_command"; commandId: string; arguments?: unknown[] }
+  | { type: "code.run_command"; shell: "cmd" | "powershell" | "bash"; command: string };
 
 const APP_PAGES = new Set<AppPage>(["Overview", "Projects", "Flowchart", "AI Chat", "Speaking Trainer", "Skills", "Design", "AI Planner", "Markdown", "AI Providers", "Settings"]);
 const DIFFICULTIES = new Set(["سهل", "متوسط", "صعب"]);
@@ -139,6 +146,48 @@ export function validateAIAppAction(value: unknown): AIAppAction | null {
       return shortText(value.name, 80) ? { type: value.type, name: shortText(value.name, 80) } : null;
     case "workspace.switch":
       return shortText(value.id, 100) ? { type: value.type, id: shortText(value.id, 100) } : null;
+    case "code.write_file": {
+      const path = shortText(value.path, 240).replaceAll("\\", "/");
+      if (!path || path.startsWith("/") || path.split("/").some((part) =>
+        !part || part === "." || part === ".." || part.includes(":") ||
+        /[<>:"|?*]/.test(part) || Array.from(part).some((character) => character.charCodeAt(0) < 32) ||
+        /[. ]$/.test(part) ||
+        /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(part)
+      ) || typeof value.content !== "string" || value.content.length > 200_000) return null;
+      return { type: value.type, path, content: value.content };
+    }
+    case "code.delete_file":
+    case "code.open_file": {
+      const path = shortText(value.path, 240).replaceAll("\\", "/");
+      if (!path || path.startsWith("/") || path.split("/").some((part) =>
+        !part || part === "." || part === ".." || part.includes(":") ||
+        /[<>:"|?*]/.test(part) || Array.from(part).some((character) => character.charCodeAt(0) < 32) ||
+        /[. ]$/.test(part) ||
+        /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(part)
+      )) return null;
+      if (value.type === "code.delete_file") return { type: value.type, path };
+      return value.line === undefined || (Number.isSafeInteger(value.line) && Number(value.line) > 0)
+        ? { type: value.type, path, ...(value.line === undefined ? {} : { line: Number(value.line) }) }
+        : null;
+    }
+    case "code.insert_text":
+    case "code.replace_selection":
+      return typeof value.text === "string" && value.text.length <= 50_000
+        ? { type: value.type, text: value.text }
+        : null;
+    case "code.execute_command": {
+      if (typeof value.commandId !== "string" || !/^[\w.-]{1,200}$/.test(value.commandId) ||
+        (value.arguments !== undefined && !Array.isArray(value.arguments))) return null;
+      const args = Array.isArray(value.arguments) ? value.arguments : undefined;
+      if (args && (args.length > 10 || JSON.stringify(args).length > 50_000)) return null;
+      return { type: value.type, commandId: value.commandId, ...(args ? { arguments: args } : {}) };
+    }
+    case "code.run_command":
+      return (value.shell === "cmd" || value.shell === "powershell" || value.shell === "bash") &&
+        typeof value.command === "string" && value.command.trim().length > 0 &&
+        value.command.length <= 2_000
+        ? { type: value.type, shell: value.shell, command: value.command }
+        : null;
     default:
       return null;
   }
@@ -166,5 +215,12 @@ export function describeAIAppAction(action: AIAppAction) {
     case "settings.update": return "تعديل إعدادات مساحة العمل";
     case "workspace.create": return `إنشاء مساحة: ${action.name}`;
     case "workspace.switch": return `تغيير مساحة العمل إلى #${action.id}`;
+    case "code.write_file": return `كتابة الملف ${action.path} في مشروع TF CODE`;
+    case "code.delete_file": return `حذف الملف ${action.path} من مشروع TF CODE`;
+    case "code.open_file": return `فتح الملف ${action.path}${action.line ? ` عند السطر ${action.line}` : ""} في VS Code`;
+    case "code.insert_text": return "إدراج نص عند موضع المؤشر في VS Code";
+    case "code.replace_selection": return "استبدال النص المحدد في VS Code";
+    case "code.execute_command": return `تشغيل أمر VS Code: ${action.commandId}`;
+    case "code.run_command": return `تشغيل أمر ${action.shell} على الكمبيوتر: ${action.command}`;
   }
 }

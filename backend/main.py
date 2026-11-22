@@ -13,6 +13,7 @@ import sys
 import tempfile
 import hashlib
 import hmac
+import base64
 import secrets
 import ipaddress
 import io
@@ -34,13 +35,19 @@ import httpx
 from av.error import FFmpegError
 from cryptography.fernet import Fernet, InvalidToken
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
+from fastapi import Body, Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, ValidationError, field_validator, model_validator
 from starlette.background import BackgroundTask
 from starlette.responses import FileResponse
 from starlette.responses import StreamingResponse
 from starlette.responses import JSONResponse, Response
+
+try:
+    from copilot import CopilotClient, RuntimeConnection
+except ImportError:
+    CopilotClient = None
+    RuntimeConnection = None
 
 load_dotenv()
 
@@ -66,6 +73,7 @@ from programming_workspace import (
     git_repository_status,
     git_stage_repository_files,
     initialize_project_workspace,
+    launch_vscode_project,
     read_project_workspace,
     run_project_command,
     write_project_workspace,
@@ -144,6 +152,7 @@ GITHUB_OAUTH_DEVICE_URL = "https://github.com/login/device/code"
 GITHUB_OAUTH_TOKEN_URL = "https://github.com/login/oauth/access_token"
 GITHUB_API_USER_URL = "https://api.github.com/user"
 GITHUB_API_BASE_URL = "https://api.github.com"
+GITHUB_COPILOT_PROVIDER_ID = "github-copilot"
 GITHUB_OAUTH_FLOW_LIFETIME = timedelta(minutes=15)
 try:
     API_PORT = int(os.getenv("TASKFLOW_API_PORT", "8000"))
@@ -781,6 +790,95 @@ async def provider_request(
             status_code=502,
             detail="Provider response format is not compatible with OpenAI Chat Completions.",
         ) from exc
+
+
+def github_copilot_provider(user: dict[str, Any] | None) -> ProviderPublic | None:
+    if user is None:
+        return None
+    with db_connection() as db:
+        account = db.execute(
+            "SELECT github_login, updated_at FROM github_accounts WHERE user_id = ?",
+            (user["id"],),
+        ).fetchone()
+    if account is None:
+        return None
+    return ProviderPublic(
+        id=GITHUB_COPILOT_PROVIDER_ID,
+        name=f"GitHub Copilot (@{account['github_login']})",
+        kind="github_copilot",
+        base_url="GitHub Copilot SDK",
+        model="auto",
+        has_api_key=True,
+        is_default=False,
+        created_at=str(account["updated_at"]),
+    )
+
+
+async def github_copilot_request(
+    user: dict[str, Any],
+    message: str,
+    system_prompt: str | None = None,
+    history: list[dict[str, str]] | None = None,
+    images: list[str] | None = None,
+) -> tuple[str, None]:
+    if CopilotClient is None or RuntimeConnection is None:
+        raise HTTPException(
+            status_code=503,
+            detail="GitHub Copilot requires Python 3.11 or newer and the Microsoft Copilot SDK.",
+        )
+    access_token = github_linked_access_token(user["id"])
+    attachments: list[dict[str, str]] = []
+    for index, image in enumerate(images or [], start=1):
+        match = re.fullmatch(r"data:(image/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/=]+)", image)
+        if not match or len(image) > 5_600_000:
+            raise HTTPException(status_code=422, detail="One of the attached images is invalid or too large.")
+        try:
+            base64.b64decode(match.group(2), validate=True)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="One of the attached images is not valid base64.") from exc
+        attachments.append({
+            "data": match.group(2),
+            "mimeType": match.group(1),
+            "displayName": f"image-{index}.{match.group(1).split('/')[-1]}",
+        })
+
+    prompt_parts = []
+    if history:
+        prompt_parts.extend(
+            f"{item['role']}: {item['content']}"
+            for item in history
+            if item.get("role") in {"user", "assistant"} and item.get("content", "").strip()
+        )
+    prompt_parts.append(message)
+    prompt = "\n\n".join(prompt_parts)
+    system_message = (
+        {"mode": "replace", "content": system_prompt}
+        if system_prompt and system_prompt.strip()
+        else None
+    )
+
+    try:
+        with tempfile.TemporaryDirectory(prefix="taskflow-copilot-") as base_directory:
+            async with CopilotClient(
+                mode="empty",
+                runtime=RuntimeConnection.for_inprocess(base_directory=base_directory),
+                github={"token": access_token, "use_logged_in_user": False},
+            ) as client:
+                session = await client.create_session(model="auto", system_message=system_message)
+                response = await session.send_and_wait(prompt, attachments=attachments or None)
+    except HTTPException:
+        raise
+    except (RuntimeError, TimeoutError, ValueError) as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="GitHub Copilot could not complete the request. Confirm this GitHub account has Copilot access and the local Copilot runtime is installed.",
+        ) from exc
+
+    content = getattr(getattr(response, "data", None), "content", None)
+    if not isinstance(content, str) or not content.strip():
+        raise HTTPException(status_code=502, detail="GitHub Copilot returned an empty response.")
+    return content.strip(), None
+
 
 async def web_search(query: str) -> tuple[list[dict[str, str]], str]:
     stop_words = {
@@ -2456,6 +2554,28 @@ async def run_programming_command(
     )
 
 
+@app.post("/api/programming/launch-vscode/{project_id}", dependencies=[Depends(require_api_token)])
+async def launch_programming_vscode(
+    project_id: str,
+    request: Request,
+    principal: dict[str, Any] | None = Depends(require_api_token),
+):
+    if not request_is_loopback(request):
+        raise HTTPException(
+            status_code=403,
+            detail="Opening a local editor is only available from this device.",
+        )
+    if auth_settings()["multi_user_enabled"] and (
+        principal is None or principal.get("role") != "admin"
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Only the local administrator may install or launch desktop applications.",
+        )
+    owner_id = principal["id"] if principal else None
+    return await asyncio.to_thread(launch_vscode_project, owner_id, project_id)
+
+
 @app.post("/api/programming/workspace", dependencies=[Depends(require_api_token)])
 async def open_programming_workspace(
     payload: ProgrammingWorkspaceRequest,
@@ -2746,6 +2866,179 @@ async def publish_theme_from_editor(
         preview_content,
         preview_extension,
     )
+
+
+@app.get("/api/programming/extensions/catalog", dependencies=[Depends(require_api_token)])
+async def programming_extension_catalog(request: Request):
+    if not request_is_loopback(request):
+        raise HTTPException(status_code=403, detail="مكتبة الإضافات متاحة على هذا الجهاز فقط.")
+
+    catalog_path = Path(__file__).resolve().parent.parent / "marketplace-repository" / "catalog.json"
+    catalog_extensions: list[dict[str, Any]] = []
+    if catalog_path.is_file():
+        try:
+            catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+            if isinstance(catalog, dict) and isinstance(catalog.get("extensions"), list):
+                catalog_extensions = [item for item in catalog["extensions"] if isinstance(item, dict)]
+        except (OSError, json.JSONDecodeError):
+            catalog_extensions = []
+
+    builtins: list[dict[str, Any]] = [
+        {
+            "id": "taskflow.taskflow-vscode-bridge",
+            "name": "TF CODE Agent Bridge",
+            "description": "ربط محرر VS Code بالمحادثة والأوامر والتعديلات الحية في TaskFlow.",
+            "publisher": "TaskFlow",
+            "kind": "bridge",
+            "official": True,
+            "asset": "bundled",
+        },
+        {
+            "id": "ms-python.python",
+            "name": "Python",
+            "description": "تشغيل وتصحيح Python وتحليل بيئة المشروع.",
+            "publisher": "Microsoft",
+            "kind": "language",
+            "official": True,
+        },
+        {
+            "id": "ms-python.vscode-pylance",
+            "name": "Pylance",
+            "description": "تكملة وتحليل واكتشاف أخطاء بايثون سريع.",
+            "publisher": "Microsoft",
+            "kind": "language",
+            "official": True,
+        },
+        {
+            "id": "ms-python.debugpy",
+            "name": "Python Debugger",
+            "description": "تشغيل اختبارات وتصحيح برامج Python داخل VS Code.",
+            "publisher": "Microsoft",
+            "kind": "debug",
+            "official": True,
+        },
+        {
+            "id": "GitHub.copilot-chat",
+            "name": "GitHub Copilot Chat",
+            "description": "محادثة ومساعدة GitHub Copilot داخل محرر VS Code.",
+            "publisher": "GitHub",
+            "kind": "ai",
+            "official": True,
+        },
+    ]
+
+    by_id: dict[str, dict[str, Any]] = {}
+    for item in [*builtins, *catalog_extensions]:
+        extension_id = item.get("id") if isinstance(item.get("id"), str) else item.get("extension_id")
+        if isinstance(extension_id, str) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", extension_id):
+            by_id[extension_id] = {**item, "id": extension_id}
+
+    return {"version": 1, "extensions": list(by_id.values())}
+
+
+@app.get("/api/programming/extensions/installed", dependencies=[Depends(require_api_token)])
+async def programming_extensions_installed(request: Request):
+    if not request_is_loopback(request):
+        raise HTTPException(status_code=403, detail="إدارة الإضافات متاحة على هذا الجهاز فقط.")
+
+    candidates = [
+        Path(os.environ["LOCALAPPDATA"]) / "Programs" / "Microsoft VS Code" / "bin" / "code.cmd"
+        if os.environ.get("LOCALAPPDATA") else None,
+        shutil.which("code"),
+    ]
+    cli: str | None = None
+    for candidate in candidates:
+        if candidate:
+            candidate_path = Path(candidate)
+            if candidate_path.is_file():
+                cli = str(candidate_path)
+                break
+    if not cli:
+        return {"extensions": []}
+
+    try:
+        result = subprocess.run(
+            [cli, "--list-extensions", "--show-versions"],
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise HTTPException(status_code=503, detail="تعذر فحص الإضافات المثبتة في VS Code.") from exc
+    if result.returncode != 0:
+        raise HTTPException(status_code=500, detail="تعذر قراءة قائمة إضافات VS Code.")
+
+    extensions = []
+    for line in result.stdout.splitlines():
+        value = line.strip()
+        if "@" not in value:
+            continue
+        extension_id, version = value.rsplit("@", 1)
+        extensions.append({"id": extension_id, "version": version})
+    return {"extensions": extensions}
+
+
+@app.post("/api/programming/extensions/install", dependencies=[Depends(require_api_token)])
+async def install_programming_extension(
+    request: Request,
+    body: dict[str, Any] = Body(...),
+):
+    if not request_is_loopback(request):
+        raise HTTPException(status_code=403, detail="تثبيت الإضافات متاح على هذا الجهاز فقط.")
+
+    extension_id = body.get("extension_id")
+    if not isinstance(extension_id, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", extension_id):
+        raise HTTPException(status_code=422, detail="معرّف الإضافة غير صالح.")
+
+    candidates = [
+        Path(os.environ["LOCALAPPDATA"]) / "Programs" / "Microsoft VS Code" / "bin" / "code.cmd"
+        if os.environ.get("LOCALAPPDATA") else None,
+        shutil.which("code"),
+        Path(os.environ["LOCALAPPDATA"]) / "Programs" / "Microsoft VS Code" / "Code.exe"
+        if os.environ.get("LOCALAPPDATA") else None,
+    ]
+    cli: str | None = None
+    for candidate in candidates:
+        if candidate:
+            candidate_path = Path(candidate)
+            if candidate_path.is_file():
+                cli = str(candidate_path)
+                break
+    if not cli:
+        executable = shutil.which("code")
+        if executable:
+            cli = executable
+    if not cli:
+        raise HTTPException(status_code=503, detail="VS Code غير متاح أو غير موجود على جهازك.")
+
+    if extension_id.lower() == "taskflow.taskflow-vscode-bridge":
+        application_root = Path(__file__).resolve().parent.parent
+        package = application_root / "vscode-extension" / "TF-CODE-Agent-Bridge.vsix"
+        if not package.is_file():
+            package = application_root / "release" / "TF-CODE-Agent-Bridge.vsix"
+        if not package.is_file():
+            raise HTTPException(status_code=500, detail="حزمة TF CODE غير موجودة في هذا الإصدار.")
+        target = str(package)
+    else:
+        target = extension_id
+
+    try:
+        result = subprocess.run(
+            [cli, "--install-extension", target, "--force"],
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            timeout=180,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise HTTPException(status_code=503, detail="تعذر تشغيل مثبّت VS Code.") from exc
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "").strip()[-1500:] or "تعذر تثبيت الإضافة."
+        raise HTTPException(status_code=500, detail=detail)
+    return {"installed": True, "extension_id": extension_id}
 
 
 @app.post("/api/programming/extensions/upload", dependencies=[Depends(require_api_token)])
@@ -4151,6 +4444,33 @@ async def read_app_data(principal: dict[str, Any] | None = Depends(require_api_t
     return {"records": records}
 
 
+@app.get("/api/data/{data_key}", dependencies=[Depends(require_api_token)])
+async def read_app_data_key(
+    data_key: str,
+    principal: dict[str, Any] | None = Depends(require_api_token),
+):
+    if data_key not in APP_DATA_KEYS:
+        raise HTTPException(status_code=404, detail="Unknown application data key.")
+    user_id = principal["id"] if principal else ""
+    with db_connection() as db:
+        row = db.execute(
+            "SELECT value_json, updated_at FROM app_data WHERE user_id = ? AND key = ?",
+            (user_id, data_key),
+        ).fetchone()
+        if not row and principal:
+            row = db.execute(
+                "SELECT value_json, updated_at FROM app_data WHERE user_id = '' AND key = ?",
+                (data_key,),
+            ).fetchone()
+    if not row:
+        return {"value": None, "updated_at": None}
+    try:
+        value = json.loads(row["value_json"])
+    except (json.JSONDecodeError, TypeError):
+        raise HTTPException(status_code=500, detail="Stored application data is invalid.")
+    return {"value": value, "updated_at": row["updated_at"]}
+
+
 @app.put("/api/data/{data_key}", dependencies=[Depends(require_api_token)])
 async def write_app_data(
     data_key: str,
@@ -4217,6 +4537,74 @@ async def read_skill_library_content(
     return await fetch_public_skill(source, skill_id)
 
 
+@app.post("/api/skills/library/install", dependencies=[Depends(require_api_token)])
+async def install_public_skill_to_taskflow(
+    body: dict[str, Any] = Body(...),
+    principal: dict[str, Any] | None = Depends(require_api_token),
+):
+    source = body.get("source")
+    skill_id = body.get("skill_id")
+    if not isinstance(source, str) or not isinstance(skill_id, str):
+        raise HTTPException(status_code=422, detail="Skill source or identifier is missing.")
+
+    fetched = await fetch_public_skill(source, skill_id)
+    content = fetched["content"]
+    safe_skill_id = re.sub(r"[^A-Za-z0-9_.-]+", "-", skill_id).strip("-. ")[:100] or "skill"
+
+    label = fetched["skill_id"]
+    frontmatter_name = re.search(r"(?m)^name:\s*['\"]?([^'\"\r\n]+)", content)
+    if frontmatter_name:
+        label = frontmatter_name.group(1).strip()
+    skill_record = {
+        "id": f"skills-sh:{source}/{skill_id}",
+        "label": label,
+        "shortcut": f"/{safe_skill_id}",
+        "description": f"مهارة من skills.sh · {source}",
+        "template": content,
+        "accent": "#8b5cf6",
+        "kind": "custom",
+        "source": f"skills.sh:{source}",
+    }
+
+    user_id = principal["id"] if principal else ""
+    with db_connection() as db:
+        row = db.execute(
+            "SELECT value_json FROM app_data WHERE key = ? AND user_id = ?",
+            ("skills", user_id),
+        ).fetchone()
+        if not row:
+            row = db.execute(
+                "SELECT value_json FROM app_data WHERE key = ? AND user_id = ''",
+                ("skills",),
+            ).fetchone()
+        try:
+            saved_skills = json.loads(row["value_json"])
+        except (TypeError, json.JSONDecodeError):
+            saved_skills = []
+        if not isinstance(saved_skills, list):
+            saved_skills = []
+        saved_skills = [item for item in saved_skills if isinstance(item, dict) and item.get("id") != skill_record["id"]]
+        saved_skills.insert(0, skill_record)
+        serialized = json.dumps(saved_skills, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+        db.execute(
+            """
+            INSERT INTO app_data (key, value_json, updated_at, user_id)
+            VALUES ('skills', ?, CURRENT_TIMESTAMP, ?)
+            ON CONFLICT(key, user_id) DO UPDATE SET
+                value_json = excluded.value_json,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (serialized, user_id),
+        )
+
+    return {
+        "installed": True,
+        "verified": True,
+        "target": "taskflow-account",
+        "skill": skill_record,
+    }
+
+
 @app.get("/api/providers", response_model=list[ProviderPublic], dependencies=[Depends(require_api_token)])
 async def list_providers(principal: dict[str, Any] | None = Depends(require_api_token)):
     with db_connection() as db:
@@ -4235,7 +4623,11 @@ async def list_providers(principal: dict[str, Any] | None = Depends(require_api_
             rows = db.execute(
                 "SELECT * FROM providers WHERE user_id IS NULL ORDER BY is_default DESC, created_at DESC"
             ).fetchall()
-    return [public_provider(row) for row in rows]
+    providers = [public_provider(row) for row in rows]
+    copilot_provider = github_copilot_provider(principal)
+    if copilot_provider is not None:
+        providers.append(copilot_provider)
+    return providers
 
 @app.post("/api/providers", response_model=ProviderPublic, status_code=201, dependencies=[Depends(require_api_token)])
 async def create_provider(
@@ -4281,6 +4673,8 @@ async def update_provider(
     payload: ProviderUpdate,
     principal: dict[str, Any] | None = Depends(require_api_token),
 ):
+    if provider_id == GITHUB_COPILOT_PROVIDER_ID:
+        raise HTTPException(status_code=409, detail="GitHub Copilot is managed by the linked GitHub account.")
     current = get_provider_row(provider_id, principal)
     updates = payload.model_dump(exclude_unset=True)
     if not updates:
@@ -4321,6 +4715,8 @@ async def delete_provider(
     provider_id: str,
     principal: dict[str, Any] | None = Depends(require_api_token),
 ):
+    if provider_id == GITHUB_COPILOT_PROVIDER_ID:
+        raise HTTPException(status_code=409, detail="GitHub Copilot is managed by the linked GitHub account.")
     current = get_provider_row(provider_id, principal)
     with db_connection() as db:
         cursor = db.execute("DELETE FROM providers WHERE id = ?", (current["id"],))
@@ -4345,6 +4741,23 @@ async def test_provider(
     provider_id: str,
     principal: dict[str, Any] | None = Depends(require_api_token),
 ):
+    if provider_id == GITHUB_COPILOT_PROVIDER_ID:
+        provider = github_copilot_provider(principal)
+        if provider is None or principal is None:
+            raise HTTPException(status_code=409, detail="Link GitHub in AI TaskFlow settings before using Copilot.")
+        reply, usage = await github_copilot_request(
+            principal,
+            "Reply with exactly: TaskFlow connection successful",
+            "You are testing the GitHub Copilot connection. Follow the user's instruction exactly.",
+        )
+        return {
+            "ok": True,
+            "provider_id": provider.id,
+            "provider_name": provider.name,
+            "model": provider.model,
+            "message": reply,
+            "usage": usage,
+        }
     row = get_provider_row(provider_id, principal)
     reply, usage = await provider_request(
         row,
@@ -4367,6 +4780,24 @@ async def chat(
     payload: ChatRequest,
     principal: dict[str, Any] | None = Depends(require_api_token),
 ):
+    if payload.provider_id == GITHUB_COPILOT_PROVIDER_ID:
+        provider = github_copilot_provider(principal)
+        if provider is None or principal is None:
+            raise HTTPException(status_code=409, detail="Link GitHub in AI TaskFlow settings before using Copilot.")
+        reply, usage = await github_copilot_request(
+            principal,
+            payload.message,
+            payload.system_prompt,
+            payload.history,
+            payload.images,
+        )
+        return ChatResponse(
+            provider_id=provider.id,
+            provider_name=provider.name,
+            model=provider.model,
+            reply=reply,
+            usage=usage,
+        )
     row = get_provider_row(payload.provider_id, principal)
     reply, usage = await provider_request(
         row,
@@ -4389,6 +4820,28 @@ async def chat_stream(
     payload: ChatRequest,
     principal: dict[str, Any] | None = Depends(require_api_token),
 ):
+    if payload.provider_id == GITHUB_COPILOT_PROVIDER_ID:
+        if github_copilot_provider(principal) is None or principal is None:
+            raise HTTPException(status_code=409, detail="Link GitHub in AI TaskFlow settings before using Copilot.")
+
+        async def stream_copilot_reply():
+            try:
+                reply, usage = await github_copilot_request(
+                    principal,
+                    payload.message,
+                    payload.system_prompt,
+                    payload.history,
+                    payload.images,
+                )
+                yield f"data: {json.dumps({'type': 'delta', 'text': reply}, ensure_ascii=False)}\n\n"
+                if usage:
+                    yield f"data: {json.dumps({'type': 'usage', 'usage': usage}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
+            except HTTPException as exc:
+                message = exc.detail if isinstance(exc.detail, str) else "GitHub Copilot could not complete the request."
+                yield f"data: {json.dumps({'type': 'error', 'message': message}, ensure_ascii=False)}\n\n"
+
+        return StreamingResponse(stream_copilot_reply(), media_type="text/event-stream")
     row = get_provider_row(payload.provider_id, principal)
     base_url = normalized_base_url(row["base_url"])
     api_key = decrypt_secret(row["encrypted_api_key"]) if row["encrypted_api_key"] else ""
@@ -4433,6 +4886,7 @@ async def chat_stream(
             yield f"data: {json.dumps({'type': 'error', 'message': message}, ensure_ascii=False)}\n\n"
 
     async def stream_events():
+        yield ": connected\n\n"
         try:
             async with httpx.AsyncClient(timeout=httpx.Timeout(10800.0, connect=12.0)) as client:
                 async with client.stream("POST", f"{base_url}/chat/completions", headers=headers, json=request_payload) as response:
@@ -4504,7 +4958,9 @@ async def chat_stream(
             _, detail = provider_http_error(exc.response.status_code, row["name"])
             yield f"data: {json.dumps({'type': 'error', 'message': detail}, ensure_ascii=False)}\n\n"
         except httpx.HTTPError:
-            yield f"data: {json.dumps({'type': 'error', 'message': 'ØªØ¹Ø°Ù‘ر Ø§Ù„Ø§ØªØµØ§Ù„ Ø¨Ù…Ø²ÙˆÙ‘د AI Ø£Ø«Ù†اء بث Ø§Ù„رد.'}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'error', 'message': 'تعذر الاتصال بمزوّد AI أثناء بث الرد.'}, ensure_ascii=False)}\n\n"
+        except Exception:
+            yield f"data: {json.dumps({'type': 'error', 'message': 'انقطع بث الرد بسبب خطأ داخلي مؤقت.'}, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(
         stream_events(),
@@ -4530,6 +4986,15 @@ async def list_models(
     provider_id: str,
     principal: dict[str, Any] | None = Depends(require_api_token),
 ):
+    if provider_id == GITHUB_COPILOT_PROVIDER_ID:
+        if github_copilot_provider(principal) is None:
+            raise HTTPException(status_code=409, detail="Link GitHub in AI TaskFlow settings before using Copilot.")
+        return {
+            "provider_id": provider_id,
+            "models": ["auto"],
+            "image_models": [],
+            "image_capabilities": {"auto": "unknown"},
+        }
     row = get_provider_row(provider_id, principal)
     base_url = normalized_base_url(row["base_url"])
     api_key = decrypt_secret(row["encrypted_api_key"]) if row["encrypted_api_key"] else ""

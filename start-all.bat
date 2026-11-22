@@ -67,7 +67,6 @@ set "TASKFLOW_API_PORT=8000"
 set "TASKFLOW_FRONTEND_PORT=5173"
 set "TASKFLOW_3D_PORT=3002"
 set "TASKFLOW_2D_PORT=5174"
-set "TASKFLOW_IDE_PORT=3102"
 set "TASKFLOW_CONFIG=%TEMP%\AI-TaskFlow-%RANDOM%-%RANDOM%.txt"
 "%TASKFLOW_PYTHON%" "scripts\launcher-config.py" > "%TASKFLOW_CONFIG%"
 if errorlevel 1 goto :python_error
@@ -207,71 +206,6 @@ if "%ENGINE_2D%"=="1" if not exist "vendor\opencalque\apps\web\dist\index.html" 
   if not exist "vendor\opencalque\apps\web\dist\index.html" goto :opencalque_error
 )
 
-if not exist "theia-app\node_modules\@theia\cli\package.json" (
-  set "INSTALL_THEIA="
-  set /p "INSTALL_THEIA=Eclipse Theia IDE dependencies are missing. Download and install them now? [Y/N]: "
-  if /I not "!INSTALL_THEIA!"=="Y" goto :install_declined
-  echo Installing Eclipse Theia IDE dependencies...
-  call npm.cmd --prefix "theia-app" ci --ignore-scripts
-  if errorlevel 1 goto :theia_error
-)
-if not exist "theia-app\node_modules\@vscode\windows-ca-certs\build\Release\crypt32.node" goto :theia_native_setup
-if not exist "theia-app\node_modules\drivelist\build\Release\drivelist.node" if not exist "theia-app\node_modules\@theia\core\node_modules\drivelist\build\Release\drivelist.node" goto :theia_native_setup
-:theia_build
-if not exist "theia-app\src-gen\backend\main.js" (
-  echo Building the AI TaskFlow Eclipse Theia IDE...
-  call npm.cmd --prefix "theia-app" run build
-  if errorlevel 1 goto :theia_error
-)
-if not exist "theia-app\src-gen\backend\main.js" goto :theia_error
-goto :theia_ready
-
-:theia_native_setup
-set "TASKFLOW_VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
-set "TASKFLOW_VS_INSTALL="
-if exist "%TASKFLOW_VSWHERE%" (
-  for /f "usebackq delims=" %%V in (`"%TASKFLOW_VSWHERE%" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "TASKFLOW_VS_INSTALL=%%V"
-)
-if not defined TASKFLOW_VS_INSTALL if exist "%ProgramFiles(x86)%\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat" set "TASKFLOW_VS_INSTALL=%ProgramFiles(x86)%\Microsoft Visual Studio\2022\BuildTools"
-if defined TASKFLOW_VS_INSTALL (
-  set "TASKFLOW_VS_SPECTRE="
-  for /d %%V in ("!TASKFLOW_VS_INSTALL!\VC\Tools\MSVC\*") do if exist "%%V\lib\spectre\x64" set "TASKFLOW_VS_SPECTRE=1"
-  if not defined TASKFLOW_VS_SPECTRE (
-    set "INSTALL_THEIA_SPECTRE="
-    set /p "INSTALL_THEIA_SPECTRE=Theia's Windows compiler needs the MSVC Spectre libraries. Install this Visual Studio component now? [Y/N]: "
-    if /I not "!INSTALL_THEIA_SPECTRE!"=="Y" goto :install_declined
-    call "%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\setup.exe" modify --installPath "%TASKFLOW_VS_INSTALL%" --add Microsoft.VisualStudio.Component.VC.14.44.17.14.x86.x64.Spectre --quiet --norestart
-    if errorlevel 1 goto :theia_native_error
-    echo MSVC Spectre libraries were installed. Restarting start-all.bat.
-    start "" "%ComSpec%" /c call "%~f0" %*
-    exit /b 0
-  )
-  echo Building required native modules for Eclipse Theia...
-  set "TrackFileAccess=false"
-  set "PATH=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer;%PATH%"
-  call npm.cmd --prefix "theia-app" rebuild
-  if errorlevel 1 goto :theia_native_error
-  if not exist "theia-app\node_modules\@vscode\windows-ca-certs\build\Release\crypt32.node" goto :theia_native_error
-  if not exist "theia-app\node_modules\drivelist\build\Release\drivelist.node" if not exist "theia-app\node_modules\@theia\core\node_modules\drivelist\build\Release\drivelist.node" goto :theia_native_error
-  goto :theia_build
-)
-set "INSTALL_THEIA_BUILD_TOOLS="
-set /p "INSTALL_THEIA_BUILD_TOOLS=Eclipse Theia needs the Visual C++ build tools to compile Windows components. Install them now with WinGet? (several GB) [Y/N]: "
-if /I not "!INSTALL_THEIA_BUILD_TOOLS!"=="Y" goto :install_declined
-where winget.exe >nul 2>nul
-if errorlevel 1 (
-  echo WinGet is unavailable. Opening the official Visual C++ Build Tools download page.
-  start "" "https://visualstudio.microsoft.com/visual-cpp-build-tools/"
-  goto :install_declined
-)
-call winget install --id Microsoft.VisualStudio.2022.BuildTools --exact --accept-package-agreements --accept-source-agreements --override "--wait --quiet --add Microsoft.VisualStudio.Workload.VCTools --add Microsoft.VisualStudio.Component.VC.14.44.17.14.x86.x64.Spectre --includeRecommended"
-if errorlevel 1 goto :theia_native_error
-echo Visual C++ Build Tools were installed. Restarting start-all.bat to compile Theia's native modules.
-start "" "%ComSpec%" /c call "%~f0" %*
-exit /b 0
-
-:theia_ready
-
 if /I "%~1"=="--install-only" (
   echo AI TaskFlow and enabled engine dependencies are ready.
   exit /b 0
@@ -281,17 +215,16 @@ if /I "%~1"=="--install-only" (
 set "TASKFLOW_RUNTIME_CONFIG=%TEMP%\AI-TaskFlow-ports-%RANDOM%-%RANDOM%.txt"
 "%TASKFLOW_PYTHON%" "scripts\runtime-config.py" discover > "%TASKFLOW_RUNTIME_CONFIG%"
 if errorlevel 1 goto :port_error
-for /f "usebackq tokens=1-6 delims=|" %%A in ("%TASKFLOW_RUNTIME_CONFIG%") do (
+for /f "usebackq tokens=1-5 delims=|" %%A in ("%TASKFLOW_RUNTIME_CONFIG%") do (
   set "TASKFLOW_API_PORT=%%A"
   set "TASKFLOW_FRONTEND_PORT=%%B"
   set "TASKFLOW_3D_PORT=%%C"
   set "TASKFLOW_2D_PORT=%%D"
-  set "TASKFLOW_IDE_PORT=%%E"
-  set "TASKFLOW_LAN_IP=%%F"
+  set "TASKFLOW_LAN_IP=%%E"
 )
 del /q "%TASKFLOW_RUNTIME_CONFIG%" >nul 2>nul
 if not defined TASKFLOW_API_PORT goto :port_error
-"%TASKFLOW_PYTHON%" "scripts\runtime-config.py" write %TASKFLOW_API_PORT% %TASKFLOW_FRONTEND_PORT% %TASKFLOW_3D_PORT% %TASKFLOW_2D_PORT% %TASKFLOW_IDE_PORT%
+"%TASKFLOW_PYTHON%" "scripts\runtime-config.py" write %TASKFLOW_API_PORT% %TASKFLOW_FRONTEND_PORT% %TASKFLOW_3D_PORT% %TASKFLOW_2D_PORT%
 if errorlevel 1 goto :port_error
 
 set "TASKFLOW_HOST=127.0.0.1"
@@ -310,7 +243,7 @@ echo ========================================================
 echo Access URL: %TASKFLOW_URL%
 if "%LOCAL_ONLY%"=="1" echo Network access is disabled. Change the host setting in the administrator settings to share this service.
 echo Host binding: %TASKFLOW_HOST%
-echo Ports: API=%TASKFLOW_API_PORT% Web=%TASKFLOW_FRONTEND_PORT% 3D=%TASKFLOW_3D_PORT% 2D=%TASKFLOW_2D_PORT% IDE=%TASKFLOW_IDE_PORT%
+echo Ports: API=%TASKFLOW_API_PORT% Web=%TASKFLOW_FRONTEND_PORT% 3D=%TASKFLOW_3D_PORT% 2D=%TASKFLOW_2D_PORT%
 echo Warning: programming terminal commands run with Administrator privileges and still require confirmation.
 echo.
 
@@ -322,7 +255,7 @@ start "AI TaskFlow - Backend" /B /D "%~dp0backend" "%TASKFLOW_PYTHON%" -X utf8 -
 echo Waiting for the backend to become ready...
 set "BACKEND_READY="
 for /L %%I in (1,1,30) do (
-  "%TASKFLOW_PYTHON%" -c "import json,urllib.request; base='http://127.0.0.1:%TASKFLOW_API_PORT%'; status=json.load(urllib.request.urlopen(base+'/api/auth/status',timeout=2)); spec=json.load(urllib.request.urlopen(base+'/openapi.json',timeout=2)); assert 'account_count' in status and '/api/skills/library/search' in spec.get('paths',{})" >nul 2>nul
+  "%TASKFLOW_PYTHON%" -c "import json,urllib.request; base='http://127.0.0.1:%TASKFLOW_API_PORT%'; status=json.load(urllib.request.urlopen(base+'/api/auth/status',timeout=2)); spec=json.load(urllib.request.urlopen(base+'/openapi.json',timeout=2)); paths=spec.get('paths',{}); assert 'account_count' in status and '/api/skills/library/search' in paths and '/api/programming/launch-vscode/{project_id}' in paths" >nul 2>nul
   if not errorlevel 1 set "BACKEND_READY=1"
   if defined BACKEND_READY goto :backend_ready
   timeout /t 1 /nobreak >nul
@@ -354,13 +287,6 @@ if "%ENGINE_2D%"=="1" (
   ) else goto :opencalque_error
 ) else echo OpenCalque 2D engine is disabled in settings.
 
-echo Starting the local Eclipse Theia IDE on 127.0.0.1:%TASKFLOW_IDE_PORT%...
-start "AI TaskFlow - Eclipse Theia IDE" /B /D "%~dp0theia-app" "%ComSpec%" /d /s /c "call npm.cmd run start -- --hostname=127.0.0.1 --port=%TASKFLOW_IDE_PORT%"
-echo Waiting for Eclipse Theia...
-"%TASKFLOW_PYTHON%" "scripts\wait-for-http.py" "http://127.0.0.1:%TASKFLOW_IDE_PORT%/" --timeout 120
-if errorlevel 1 goto :theia_start_error
-echo Eclipse Theia IDE is ready.
-
 start "AI TaskFlow - Frontend" /B /D "%~dp0" "%ComSpec%" /d /s /c ""%TASKFLOW_NODE%" "%~dp0node_modules\vite\bin\vite.js" preview --host %TASKFLOW_HOST% --port %TASKFLOW_FRONTEND_PORT%"
 echo Waiting for the AI TaskFlow page...
 "%TASKFLOW_PYTHON%" "scripts\wait-for-http.py" "http://127.0.0.1:%TASKFLOW_FRONTEND_PORT%/" --timeout 45
@@ -379,24 +305,6 @@ exit /b 0
 if defined TASKFLOW_CONFIG if exist "%TASKFLOW_CONFIG%" del /q "%TASKFLOW_CONFIG%" >nul 2>nul
 echo Bundled Python is missing or its backend libraries are incomplete.
 echo Reinstall AI TaskFlow or run scripts\install-prerequisites.bat.
-pause
-exit /b 1
-
-:theia_error
-echo Eclipse Theia dependencies or build are unavailable or incomplete.
-echo Check the npm output and Node.js version, then run start-all.bat again.
-pause
-exit /b 1
-
-:theia_native_error
-echo Eclipse Theia's Windows native modules could not be built.
-echo Install or repair Visual Studio Build Tools with the Desktop development with C++ workload, then retry.
-pause
-exit /b 1
-
-:theia_start_error
-echo Eclipse Theia did not become ready. Check the "AI TaskFlow - Eclipse Theia IDE" window.
-echo Confirm that port %TASKFLOW_IDE_PORT% is available, then run start-all.bat again.
 pause
 exit /b 1
 
@@ -433,7 +341,7 @@ pause
 exit /b 1
 
 :node_error
-echo Node.js 24 or later with npm is required by Eclipse Theia.
+echo Node.js 24 or later with npm is required to build the TaskFlow web application.
 set "INSTALL_NODE="
 set /p "INSTALL_NODE=Install Node.js LTS with winget now? [Y/N]: "
 if /I "!INSTALL_NODE!"=="Y" (

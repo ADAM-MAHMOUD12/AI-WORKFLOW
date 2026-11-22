@@ -1,4 +1,4 @@
-type TaskflowPorts = { api?: number; frontend?: number; engine3d?: number; engine2d?: number; theia?: number };
+type TaskflowPorts = { api?: number; frontend?: number; engine3d?: number; engine2d?: number };
 
 declare global {
   interface Window {
@@ -10,7 +10,6 @@ const runtimePorts = window.TASKFLOW_PORTS;
 const servicePorts: Record<number, number | undefined> = {
   3002: runtimePorts?.engine3d,
   5174: runtimePorts?.engine2d,
-  3102: runtimePorts?.theia,
 };
 
 export const API_BASE = `${window.location.protocol}//${window.location.hostname}:${runtimePorts?.api ?? 8000}`;
@@ -28,6 +27,43 @@ export function sanitizeArtifactFilename(value: string, fallback: string): strin
 }
 
 const SESSION_KEY = "taskflow-auth-session-v1";
+const SAVED_ACCOUNTS_KEY = "taskflow-auth-saved-accounts-v1";
+
+export type SavedAuthAccount = {
+  id: string;
+  username: string;
+  role: "admin" | "user";
+  status: "approved" | "pending" | "rejected";
+  token: string;
+  is_blocked?: boolean;
+  block_note?: string;
+  created_at: string;
+};
+
+export function getSavedAccounts(): SavedAuthAccount[] {
+  try {
+    const value = localStorage.getItem(SAVED_ACCOUNTS_KEY);
+    if (!value) return [];
+    const parsed: unknown = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is SavedAuthAccount =>
+      typeof item?.id === "string" && typeof item?.username === "string" &&
+      typeof item?.token === "string" && (item.role === "admin" || item.role === "user"));
+  } catch {
+    return [];
+  }
+}
+
+export function saveSavedAccount(account: SavedAuthAccount) {
+  const accounts = getSavedAccounts().filter((item) => item.id !== account.id);
+  localStorage.setItem(SAVED_ACCOUNTS_KEY, JSON.stringify([account, ...accounts].slice(0, 12)));
+}
+
+export function removeSavedAccount(accountId: string) {
+  localStorage.setItem(SAVED_ACCOUNTS_KEY, JSON.stringify(
+    getSavedAccounts().filter((item) => item.id !== accountId),
+  ));
+}
 
 export function getSessionToken(): string | null {
   try {

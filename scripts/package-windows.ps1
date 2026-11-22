@@ -97,6 +97,9 @@ try {
   npm.cmd run build
   if ($LASTEXITCODE -ne 0) { throw "Frontend production build failed." }
 
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "package-vscode-extension.ps1")
+  if ($LASTEXITCODE -ne 0) { throw "TF CODE VS Code extension packaging failed." }
+
   New-Item -ItemType Directory -Force -Path $output, $runtimeCache | Out-Null
   Get-Download "https://www.python.org/ftp/python/$pythonVersion/python-$pythonVersion-embed-amd64.zip" $pythonArchive
   Get-Download "https://nodejs.org/dist/v$nodeVersion/node-v$nodeVersion-win-x64.zip" $nodeArchive
@@ -154,7 +157,7 @@ try {
   }
 
   New-Item -ItemType Directory -Force -Path $payload | Out-Null
-  $excludedRootDirectories = @(".git", ".vscode", "data", "release", "installer")
+  $excludedRootDirectories = @(".git", ".vscode", "data", "release", "installer", "theia-app")
   foreach ($directory in Get-ChildItem $root -Directory -Force) {
     if ($excludedRootDirectories -contains $directory.Name) { continue }
     $destination = Join-Path $payload $directory.Name
@@ -188,6 +191,7 @@ try {
     if ($file.Name -in @(".env", "desktop.ini", "OPENFILM-AI TASKFLOW EDITION.spec", "test_gemini.py")) { continue }
     Copy-Item $file.FullName $payload -Force
   }
+  Copy-Item (Join-Path $output "TF-CODE-Agent-Bridge.vsix") (Join-Path $payload "vscode-extension\TF-CODE-Agent-Bridge.vsix") -Force
   Copy-Item $runtimeRoot (Join-Path $payload "runtime") -Recurse -Force
 
   foreach ($excludedPath in @("data", "backend\data", "backend\.venv", "release", "installer")) {
@@ -206,6 +210,7 @@ try {
     "runtime\python\python.exe",
     "runtime\node\node.exe",
     "runtime\bun.exe",
+    "vscode-extension\TF-CODE-Agent-Bridge.vsix",
     "dist\index.html"
   )) {
     if (-not (Test-Path (Join-Path $payload $requiredPath))) {

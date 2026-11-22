@@ -69,6 +69,7 @@
 .provider-item-icon { display: grid; place-items: center; width: 44px; height: 44px; flex-shrink: 0; border-radius: 13px; }
 .provider-item-icon.cloud { color: #c4b5fd; background: linear-gradient(135deg, #8b5cf62b, #6366f11a); }
 .provider-item-icon.local { color: #6ee7b7; background: #10b9811a; }
+.provider-item-icon.github { color: #c4b5fd; background: #8b5cf62b; }
 .provider-item-main { flex: 1; min-width: 0; }
 .provider-item-title { gap: 8px; flex-wrap: wrap; }
 .provider-item-title h3 { font-size: 14px; margin: 2px 0 5px; overflow-wrap: anywhere; }

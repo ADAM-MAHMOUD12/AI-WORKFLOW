@@ -61,3 +61,135 @@
   margin: 0;
   color: #ffb6c1;
 }
+
+.account-security-settings > .account-security-notice {
+  margin: 0;
+  color: #86efac;
+}
+
+.account-list {
+  display: grid;
+  gap: 8px;
+}
+
+.account-row {
+  display: grid;
+  grid-template-columns: 38px minmax(150px, 1fr) auto auto auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.account-row.active {
+  border-color: rgba(52, 211, 153, 0.35);
+  background: rgba(6, 78, 59, 0.16);
+}
+
+.account-avatar {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  border-radius: 50%;
+  color: #c4b5fd;
+  background: rgba(139, 92, 246, 0.12);
+}
+
+.account-copy {
+  min-width: 0;
+}
+
+.account-copy strong,
+.account-copy small {
+  display: block;
+}
+
+.account-copy strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #f1f5f9;
+  white-space: nowrap;
+}
+
+.account-copy small {
+  margin-top: 2px;
+  color: var(--muted, #8e8ea6);
+  font-size: 11px;
+}
+
+.account-row button,
+.account-add-form button {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.account-remove-button {
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  color: #cbd5e1;
+  background: rgba(15, 23, 42, 0.6);
+}
+
+.account-empty {
+  margin: 0;
+  color: var(--muted, #8e8ea6);
+}
+
+.account-add-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr)) auto;
+  align-items: end;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  border-radius: 10px;
+  background: rgba(139, 92, 246, 0.06);
+}
+
+.account-add-form label {
+  display: grid;
+  gap: 6px;
+  color: #cbd5e1;
+  font-size: 11px;
+}
+
+.account-add-form input {
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.75);
+  color: #f8fafc;
+  font: inherit;
+}
+
+.account-add-form > div {
+  display: flex;
+  gap: 7px;
+}
+
+@media (max-width: 760px) {
+  .account-row {
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+
+  .account-row button {
+    grid-column: 2;
+  }
+
+  .account-add-form {
+    grid-template-columns: 1fr;
+  }
+}

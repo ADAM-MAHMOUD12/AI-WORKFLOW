@@ -33,6 +33,13 @@ import AIChat, { type FlowchartArtifact } from "./AIChat";
 import { FLOW_SHAPES, type FlowShape } from "./flowchartTypes";
 import { readCustomSkills, toSkillShortcut, type SkillSuggestion } from "./skills";
 import { describeAIAppAction, type AIAppAction } from "./aiActions";
+import {
+  executeVscodeActions,
+  getActiveVscodeBridgeProjectId,
+  getVscodeBridgeMode,
+  getVscodeBridgeToken,
+  sendVscodeBridgeHeartbeat,
+} from "./vscodeBridge";
 import { getCachedAppData, usePersistentAppData, writeAppData } from "./appData";
 import AIPlanner from "./AIPlanner";
 import AIProviders from "./AIProviders";
@@ -212,6 +219,25 @@ function WorkspaceApp() {
   const { user, status } = useAuth();
   const language = useLanguage();
   const t = (text: string) => translate(text, language);
+  useEffect(() => {
+    let active = true;
+    const heartbeat = () => {
+      if (!active) return;
+      const projectId = getActiveVscodeBridgeProjectId();
+      if (!projectId || !getVscodeBridgeToken(projectId)) return;
+      void sendVscodeBridgeHeartbeat(projectId).catch((reason) => {
+        if (!(reason instanceof TypeError)) {
+          console.error("تعذر تحديث الاتصال الحي مع إضافة VS Code:", reason);
+        }
+      });
+    };
+    heartbeat();
+    const timer = window.setInterval(heartbeat, 15_000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, []);
   const [savedData] = useState<SavedData>(() => loadSavedData());
   const [localWorkspaceStore] = useState<WorkspaceStore>(() => readWorkspaceStore(savedData));
   const [workspaceStore, setWorkspaceStore, workspaceDataReady] = usePersistentAppData<WorkspaceStore>(
@@ -239,6 +265,18 @@ function WorkspaceApp() {
   const workspaceSwitcher = useRef<HTMLDivElement>(null);
 
   const [page, setPage] = useState<Page>("Overview");
+  useEffect(() => {
+    const openTfCodeLibrary = () => {
+      const params = new URLSearchParams(window.location.search);
+      if (window.location.hash === "#tf-code-library" || params.has("tf-code-library")) {
+        setPage("Programming");
+        window.setTimeout(() => window.dispatchEvent(new CustomEvent("taskflow:open-tf-code-library")), 250);
+      }
+    };
+    openTfCodeLibrary();
+    window.addEventListener("hashchange", openTfCodeLibrary);
+    return () => window.removeEventListener("hashchange", openTfCodeLibrary);
+  }, []);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
       return localStorage.getItem("taskflow-sidebar-collapsed-v1") === "true";
@@ -246,21 +284,6 @@ function WorkspaceApp() {
       return false;
     }
   });
-  useEffect(() => {
-    const theiaOrigin = new URL(serviceUrl(3102)).origin;
-    const handleTheiaMessage = (event: MessageEvent<unknown>) => {
-      if (event.origin !== theiaOrigin || !event.data || typeof event.data !== "object" ||
-        !("type" in event.data) || typeof event.data.type !== "string") return;
-      if (event.data.type === "taskflow:toggle-platform-sidebar") {
-        setSidebarCollapsed((current) => !current);
-        window.dispatchEvent(new Event("taskflow:mobile-sidebar-toggle"));
-      } else if (event.data.type === "taskflow:return-to-platform") {
-        setPage("Overview");
-      }
-    };
-    window.addEventListener("message", handleTheiaMessage);
-    return () => window.removeEventListener("message", handleTheiaMessage);
-  }, []);
   useEffect(() => {
     try {
       localStorage.setItem("taskflow-sidebar-collapsed-v1", String(sidebarCollapsed));
@@ -465,7 +488,7 @@ function WorkspaceApp() {
     setTasks((current) => current.map((task) => task.id === id ? { ...task, difficulty } : task));
   }
 
-  async function executeAIAppActions(actions: AIAppAction[]) {
+  async function executeAIAppActions(actions: AIAppAction[], teamMode = false, onProgress?: (output: string) => void, signal?: AbortSignal) {
     const results: string[] = [];
     for (const action of actions) {
       switch (action.type) {
@@ -601,6 +624,81 @@ function WorkspaceApp() {
           if (!workspace) throw new Error(`لم أجد مساحة العمل #${action.id}.`);
           switchWorkspace(workspace);
           results.push(describeAIAppAction(action));
+          break;
+        }
+        case "code.write_file": {
+          const projectId = localStorage.getItem("taskflow-programming-active-v1") ??
+            localStorage.getItem("taskflow.programming.active-project.v1");
+          if (!projectId || !/^[a-f0-9]{32}$/.test(projectId)) {
+            throw new Error("افتح TF CODE مرة واحدة أولًا حتى أجهز مساحة المشروع.");
+          }
+          if (getVscodeBridgeToken(projectId)) {
+            results.push(await executeVscodeActions(projectId, [action], getVscodeBridgeMode(), teamMode, onProgress, signal));
+            break;
+          }
+          const response = await apiFetch(`${API_BASE}/api/programming/workspace`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              project_id: projectId,
+              files: [{ path: action.path, content: action.content }],
+            }),
+          });
+          const body: unknown = await response.json();
+          if (!response.ok) {
+            const detail = body && typeof body === "object" && "detail" in body && typeof body.detail === "string"
+              ? body.detail
+              : "تعذّرت كتابة الملف في مساحة TF CODE.";
+            throw new Error(detail);
+          }
+          results.push(`تم تحديث ${action.path} في مساحة TF CODE.`);
+          break;
+        }
+        case "code.delete_file":
+        case "code.open_file":
+        case "code.insert_text":
+        case "code.replace_selection":
+        case "code.execute_command": {
+          const projectId = localStorage.getItem("taskflow-programming-active-v1") ??
+            localStorage.getItem("taskflow.programming.active-project.v1");
+          if (!projectId || !/^[a-f0-9]{32}$/.test(projectId)) {
+            throw new Error("افتح TF CODE مرة واحدة أولًا حتى أجهز مساحة المشروع.");
+          }
+          results.push(await executeVscodeActions(projectId, [action], getVscodeBridgeMode(), teamMode, onProgress, signal));
+          break;
+        }
+        case "code.run_command": {
+          const projectId = localStorage.getItem("taskflow-programming-active-v1") ??
+            localStorage.getItem("taskflow.programming.active-project.v1");
+          if (!projectId || !/^[a-f0-9]{32}$/.test(projectId)) {
+            throw new Error("افتح TF CODE مرة واحدة أولًا حتى أجهز مساحة المشروع.");
+          }
+          if (getVscodeBridgeToken(projectId)) {
+            results.push(await executeVscodeActions(projectId, [action], getVscodeBridgeMode(), teamMode, onProgress, signal));
+            break;
+          }
+          if (teamMode) {
+            throw new Error("شغّل دورة الفريق بعد ربط إضافة VS Code حتى يمكن التقاط مخرجات الأمر ورمز خروجه.");
+          }
+          const response = await apiFetch(`${API_BASE}/api/programming/run`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ project_id: projectId, shell: action.shell, command: action.command }),
+          });
+          const body: unknown = await response.json();
+          if (!response.ok) {
+            const detail = body && typeof body === "object" && "detail" in body && typeof body.detail === "string"
+              ? body.detail
+              : "تعذّر تشغيل الأمر في مساحة TF CODE.";
+            throw new Error(detail);
+          }
+          if (!body || typeof body !== "object" || !("output" in body) ||
+            typeof body.output !== "string" || !("exit_code" in body) ||
+            typeof body.exit_code !== "number" || !("timed_out" in body) ||
+            typeof body.timed_out !== "boolean") {
+            throw new Error("أعاد تشغيل الأمر نتيجة غير صالحة.");
+          }
+          results.push(`نتيجة الأمر (${body.exit_code}${body.timed_out ? "، انتهت المهلة" : ""}):\n${body.output || "(لا يوجد إخراج)"}`);
           break;
         }
       }
@@ -964,15 +1062,27 @@ function WorkspaceApp() {
     }
 
     if (page === "Motion Graphics") {
-      return <MotionGraphicsStudio />;
+      return <MotionGraphicsStudio onOpenTfCode={() => setPage("Programming")} />;
     }
 
     if (page === "Programming") {
-      return <ProgrammingStudio onExit={() => setPage("Overview")} />;
+      return <ProgrammingStudio
+        onExit={() => setPage("Overview")}
+        onOpenAgent={() => {
+          sessionStorage.setItem("taskflow-ai-chat-next-mode-v1", "code");
+          setPage("AI Chat");
+        }}
+      />;
     }
 
     if (page === "Content Editing") {
-      return <ContentEditingStudio />;
+      return <ContentEditingStudio
+        onOpenMotion={(prompt) => {
+          sessionStorage.setItem("taskflow-motion-initial-prompt-v1", prompt);
+          setPage("Motion Graphics");
+        }}
+        onOpenTfCode={() => setPage("Programming")}
+      />;
     }
 
     if (page === "AI TaskFlow 3D") {

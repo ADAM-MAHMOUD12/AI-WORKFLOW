@@ -5,6 +5,7 @@ import {
   ChevronDown,
   CircleAlert,
   Cpu,
+  GitBranch,
   LoaderCircle,
   Plus,
   RefreshCw,
@@ -18,7 +19,7 @@ import "./AIProviders.css";
 import { useLanguage, translate } from "./localization";
 
 
-type ProviderKind = "openai_compatible" | "ollama";
+type ProviderKind = "openai_compatible" | "ollama" | "github_copilot";
 type PresetId = "openai" | "gemini" | "gemma" | "grok" | "groq" | "openrouter" | "deepseek" | "together" | "mistral" | "ollama" | "custom";
 type ProviderPreset = { id: PresetId; label: string; kind: ProviderKind; base_url: string; model: string; key_url: string; docs_url: string; instructions: string; note: string };
 const PRESETS: ProviderPreset[] = [
@@ -377,23 +378,29 @@ export default function AIProviders() {
           {providers.map((provider) => (
             <article className="provider-item-card" key={provider.id}>
               <div className="provider-item-top">
-                <div className={`provider-item-icon ${provider.kind === "ollama" ? "local" : "cloud"}`}>
-                  {provider.kind === "ollama" ? <Cpu size={22} /> : <BrainCircuitIcon />}
+                <div className={`provider-item-icon ${provider.kind === "ollama" ? "local" : provider.kind === "github_copilot" ? "github" : "cloud"}`}>
+                  {provider.kind === "ollama" ? <Cpu size={22} /> : provider.kind === "github_copilot" ? <GitBranch size={22} /> : <BrainCircuitIcon />}
                 </div>
                 <div className="provider-item-main">
                   <div className="provider-item-title">
                     <h3>{provider.name}</h3>
                     {provider.is_default && <span className="provider-default-badge"><CheckCircle2 size={12} /> {translate("الافتراضي", language)}</span>}
                   </div>
-                  <p>{provider.kind === "ollama" ? translate("نموذج محلي عبر Ollama", language) : translate("واجهة API متوافقة مع OpenAI", language)}</p>
+                  <p>{provider.kind === "ollama"
+                    ? translate("نموذج محلي عبر Ollama", language)
+                    : provider.kind === "github_copilot"
+                      ? translate("يستخدم اشتراك Copilot لحساب GitHub المرتبط", language)
+                      : translate("واجهة API متوافقة مع OpenAI", language)}</p>
                 </div>
-                <button className="provider-delete-btn" onClick={() => void deleteProvider(provider)} disabled={busyId === provider.id} title={translate("حذف المزوّد", language)} aria-label={translate(`حذف ${provider.name}`, language)}><Trash2 size={17} /></button>
+                {provider.kind !== "github_copilot" && <button className="provider-delete-btn" onClick={() => void deleteProvider(provider)} disabled={busyId === provider.id} title={translate("حذف المزوّد", language)} aria-label={translate(`حذف ${provider.name}`, language)}><Trash2 size={17} /></button>}
               </div>
 
               <div className="provider-details">
                 <div><span>{translate("الموديل", language)}</span><code>{provider.model}</code></div>
                 <div><span>{translate("عنوان API", language)}</span><code dir="ltr">{provider.base_url}</code></div>
-                <div><span>{translate("مفتاح API", language)}</span><strong>{provider.has_api_key ? translate("محفوظ بشكل مشفّر", language) : translate("بدون مفتاح", language)}</strong></div>
+                <div><span>{translate(provider.kind === "github_copilot" ? "حساب GitHub" : "مفتاح API", language)}</span><strong>{provider.kind === "github_copilot"
+                  ? translate("يستخدم ربط GitHub المحفوظ", language)
+                  : provider.has_api_key ? translate("محفوظ بشكل مشفّر", language) : translate("بدون مفتاح", language)}</strong></div>
               </div>
 
               {modelLists[provider.id] && (
@@ -406,9 +413,11 @@ export default function AIProviders() {
               )}
 
               <div className="provider-item-footer">
-                <span className="provider-key-state"><ShieldCheck size={14} /> {provider.has_api_key ? translate("المفتاح محفوظ بأمان", language) : translate("لا يوجد مفتاح محفوظ", language)}</span>
+                <span className="provider-key-state"><ShieldCheck size={14} /> {provider.kind === "github_copilot"
+                  ? translate("يستخدم ربط GitHub المحفوظ", language)
+                  : provider.has_api_key ? translate("المفتاح محفوظ بأمان", language) : translate("لا يوجد مفتاح محفوظ", language)}</span>
                 <div className="provider-item-actions">
-                  {!provider.is_default && <button className="provider-btn provider-btn-ghost small" onClick={() => void makeDefault(provider)} disabled={busyId === provider.id}>{translate("تعيين افتراضي", language)}</button>}
+                  {provider.kind !== "github_copilot" && !provider.is_default && <button className="provider-btn provider-btn-ghost small" onClick={() => void makeDefault(provider)} disabled={busyId === provider.id}>{translate("تعيين افتراضي", language)}</button>}
                   <button className="provider-btn provider-btn-ghost small" onClick={() => void fetchModels(provider)} disabled={busyId === provider.id}>
                     {busyId === provider.id ? <LoaderCircle className="spin" size={15} /> : <RefreshCw size={15} />}
                     {translate("الموديلات", language)}

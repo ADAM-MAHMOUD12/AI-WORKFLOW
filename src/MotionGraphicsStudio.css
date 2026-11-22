@@ -8,7 +8,45 @@
 .motion-heading {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 14px;
+}
+
+.motion-heading-copy {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 14px;
+}
+
+.motion-tf-code-link {
+  display: inline-flex;
+  min-height: 44px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 14px;
+  border: 1px solid rgba(96, 165, 250, 0.42);
+  border-radius: 9px;
+  color: #dbeafe;
+  background: rgba(37, 99, 235, 0.16);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.motion-tf-code-link:hover {
+  background: rgba(37, 99, 235, 0.27);
+}
+
+.motion-tf-code-link:focus-visible,
+.motion-record-button:focus-visible,
+.motion-character-upload:focus-within,
+.motion-character-list button:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 3px;
 }
 
 .motion-icon {
@@ -93,6 +131,130 @@
   line-height: 1.8;
 }
 
+.motion-production-setup,
+.motion-character-board {
+  display: grid;
+  gap: 11px;
+  padding: 12px;
+  border: 1px solid rgba(96, 165, 250, 0.2);
+  border-radius: 12px;
+  background: rgba(11, 17, 29, 0.62);
+}
+
+.motion-production-setup > small,
+.motion-character-board > small {
+  color: #a9bddb;
+  font-size: 10px;
+  line-height: 1.65;
+}
+
+.motion-output-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.motion-character-heading {
+  display: grid;
+  gap: 5px;
+}
+
+.motion-character-heading strong {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #e0eaff;
+  font-size: 12px;
+}
+
+.motion-character-heading small {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.motion-character-upload {
+  position: relative;
+  display: flex !important;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px !important;
+  border: 1px dashed rgba(96, 165, 250, 0.42);
+  border-radius: 9px;
+  color: #bfdbfe;
+  background: rgba(59, 130, 246, 0.08);
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.motion-character-upload input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.motion-character-upload:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.56;
+}
+
+.motion-character-list {
+  display: grid;
+  gap: 6px;
+}
+
+.motion-character-list article {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.motion-character-list img {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: #10151d;
+}
+
+.motion-character-list span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: #e6edf3;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.motion-character-list button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  place-items: center;
+  border: 1px solid rgba(248, 113, 113, 0.22);
+  border-radius: 7px;
+  color: #fecaca;
+  background: rgba(127, 29, 29, 0.2);
+  cursor: pointer;
+}
+
+.motion-character-list button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .motion-audio-upload,
 .motion-video-upload {
   position: relative;
@@ -165,6 +327,33 @@
 .motion-voiceover small {
   color: #9fb6ac;
   font-size: 9px;
+}
+
+.motion-record-button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid rgba(251, 191, 36, 0.32);
+  border-radius: 9px;
+  color: #fde68a;
+  background: rgba(146, 64, 14, 0.15);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.motion-record-button.recording {
+  border-color: rgba(248, 113, 113, 0.48);
+  color: #fecaca;
+  background: rgba(127, 29, 29, 0.26);
+}
+
+.motion-record-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
 }
 
 .motion-voiceover button {
@@ -659,6 +848,18 @@
 }
 
 @media (max-width: 480px) {
+  .motion-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .motion-tf-code-link {
+    align-self: stretch;
+  }
+
+  .motion-output-grid {
+    grid-template-columns: 1fr;
+  }
   .motion-controls,
   .motion-preview-panel {
     padding: 12px;

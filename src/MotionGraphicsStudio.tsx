@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Clapperboard, ExternalLink, Headphones, ImagePlus, LoaderCircle, Search, Sparkles, Upload, Video, WandSparkles } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Clapperboard, Code2, ExternalLink, Headphones, ImagePlus, LoaderCircle, Mic, Search, Sparkles, Square, Trash2, Upload, Video, WandSparkles } from "lucide-react";
 import { API_BASE, apiFetch, deliverArtifactToTelegram, sanitizeArtifactFilename } from "./api";
 import "./MotionGraphicsStudio.css";
 import { useLanguage, translate } from "./localization";
@@ -11,6 +11,11 @@ import {
 } from "./motionW2M";
 
 const AI_IDLE_TIMEOUT_MS = 120_000;
+const MAX_AUTOMATIC_W2M_REPAIRS = 2;
+
+function w2mRepairPrompt(diagnostics: string, source: string): string {
+  return `The complete W2M/2 source below failed compilation. Repair every compiler diagnostic and return the entire corrected W2M/2 program only. Preserve the intended project and all valid HTML content. Do not explain or return a patch.\n\nCOMPILER DIAGNOSTICS:\n${diagnostics}\n\nSOURCE TO REPAIR:\n${source}`;
+}
 
 type Provider = { id: string; name: string; model: string; is_default: boolean };
 type ImageAsset = { id: string; title: string; thumbnail: string; sourceUrl: string; credit: string; license: string };
@@ -36,6 +41,29 @@ type VideoReference = {
 };
 type AudioAnalysis = { has_voiceover: boolean; duration: number | null; quiet_spans: Array<{ start: number; end: number }> };
 type ImageInputSupport = "yes" | "no" | "unknown";
+type ProductionType = "cartoon" | "tutorial" | "story" | "advertisement";
+type MotionAspectRatio = "16:9" | "9:16" | "1:1";
+type CharacterReference = { id: string; name: string; dataUrl: string };
+
+const CANVAS_DIMENSIONS: Record<MotionAspectRatio, { width: number; height: number }> = {
+  "16:9": { width: 1920, height: 1080 },
+  "9:16": { width: 1080, height: 1920 },
+  "1:1": { width: 1080, height: 1080 },
+};
+
+const PRODUCTION_PROMPTS: Record<ProductionType, string> = {
+  cartoon: "Create a narrated cartoon with a clear character-led story, consistent original character designs guided by the supplied reference images, and scenes that can be edited separately.",
+  tutorial: "Create a step-by-step educational lesson with a clear opening, visual chapters, deliberate demonstrations, and a concise recap.",
+  story: "Create a visual story with a strong beginning, a meaningful change, and a resolved ending.",
+  advertisement: "Create a concise product advertisement with a strong hook, clear benefit, proof, and a specific closing call to action.",
+};
+function isProductionType(value: string): value is ProductionType {
+  return value === "cartoon" || value === "tutorial" || value === "story" || value === "advertisement";
+}
+
+function isMotionAspectRatio(value: string): value is MotionAspectRatio {
+  return value === "16:9" || value === "9:16" || value === "1:1";
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -163,24 +191,24 @@ async function describeVideoReference(file: File): Promise<VideoReference> {
   return reference;
 }
 
-function starterProject(title: string, duration: number): OpenFilmProject {
+function starterProject(title: string, duration: number, width: number, height: number): OpenFilmProject {
   const safeTitle = title.trim().slice(0, 160) || "MOTION AI TASKFLOW";
   const sceneHtml = `<!doctype html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=1280,height=720">
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=${width},height=${height}">
 <title>${safeTitle.replace(/[<>&"]/g, "")}</title>
 <style>
-*{box-sizing:border-box}html,body{margin:0;width:1280px;height:720px;overflow:hidden}
+*{box-sizing:border-box}html,body{margin:0;width:${width}px;height:${height}px;overflow:hidden}
 body{display:grid;place-items:center;background:radial-gradient(ellipse at 70% 20%,#563f91,#111323 58%,#070910);color:#fff;font-family:Arial,sans-serif}
 main{text-align:center}.mark{font-size:18px;letter-spacing:.28em;color:#c4b5fd}h1{font-size:64px;margin:18px}
 </style></head><body><main id="intro"><span class="mark">MOTION AI TASKFLOW</span><h1>مشروعك يبدأ من هنا</h1></main>
 <script>
 const intro=document.getElementById("intro");
-window.film={duration:${duration},width:1280,height:720,frame(t){intro.style.opacity=String(Math.max(0,Math.min(1,t/.35)));}};
+window.film={duration:${duration},width:${width},height:${height},frame(t){intro.style.opacity=String(Math.max(0,Math.min(1,t/.35)));}};
 </script></body></html>`;
-  const filmHtml = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=1280,height=720"><title>${safeTitle.replace(/[<>&"]/g, "")}</title>
-<style>html,body{margin:0;width:1280px;height:720px;overflow:hidden;background:#070910}iframe{display:block;width:1280px;height:720px;border:0}</style></head>
+  const filmHtml = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=${width},height=${height}"><title>${safeTitle.replace(/[<>&"]/g, "")}</title>
+<style>html,body{margin:0;width:${width}px;height:${height}px;overflow:hidden;background:#070910}iframe{display:block;width:${width}px;height:${height}px;border:0}</style></head>
 <body><section><iframe id="shot-01" src="scene-01.html#t=0,${duration.toFixed(3)}"></iframe></section></body></html>`;
-  return { title: safeTitle, width: 1280, height: 720, duration, film_html: filmHtml, scenes: [{ file: "scene-01.html", duration, html: sceneHtml }] };
+  return { title: safeTitle, width, height, duration, film_html: filmHtml, scenes: [{ file: "scene-01.html", duration, html: sceneHtml }] };
 }
 
 function projectPrompt(
@@ -190,7 +218,13 @@ function projectPrompt(
   voiceoverDuration?: number,
   audioAnalysis?: AudioAnalysis,
   videoReference?: VideoReference,
-  attachReferenceFrames = true,
+  characterDescriptions: string[] = [],
+  attachReferenceImages = true,
+  productionType: ProductionType = "cartoon",
+  aspectRatio: MotionAspectRatio = "16:9",
+  frameRate = 30,
+  requestedDuration = 30,
+  durationCustomized = false,
 ) {
   const mediaList = assets.map((asset) => ({
     title: asset.title,
@@ -199,16 +233,20 @@ function projectPrompt(
     credit: asset.credit,
     license: asset.license,
   }));
-  const targetDuration = audioAnalysis?.duration ?? voiceoverDuration ?? current?.duration ?? 30;
+  const targetDuration = audioAnalysis?.duration ?? voiceoverDuration ??
+    (durationCustomized ? requestedDuration : current?.duration ?? requestedDuration);
   const targetSceneCount = Math.max(4, Math.min(10, Math.ceil(targetDuration / 18)));
+  const { width, height } = CANVAS_DIMENSIONS[aspectRatio];
   const common = `Act as an award-winning motion-design director and an exacting OpenFilm editor. Create a distinctive, production-ready film for this brief:
 ${brief}
 
+Production format: ${productionType}. ${PRODUCTION_PROMPTS[productionType]}
+Canvas aspect ratio: ${aspectRatio} (${width}x${height}). Design for a ${frameRate} fps playback cadence; the user may need to select the same frame rate in OpenFilm's playback/export controls.
 OpenFilm is the actual editor and timeline, not a preview wrapper. Use the strict W2M/2 language below, not JSON. Metadata and block delimiters are grammar; keep each on its own line. Write raw HTML only between its matching HTML BEGIN/END lines. Never put a W2M control line inside HTML.
 W2M/2
 DO PROJECT
 TITLE "concise project title"
-CANVAS 1280x720
+CANVAS ${width}x${height}
 DURATION ${targetDuration.toFixed(3)}s
 SCENES ${targetSceneCount}
 DO FILM
@@ -223,7 +261,7 @@ complete standalone scene HTML source, raw HTML
 HTML scene-01.html END
 END SCENE
 Repeat the DO SCENE block for every scene, then write END PROJECT and END W2M. TITLE is a JSON-quoted string. Use exact sequential filenames scene-01.html through scene-${String(targetSceneCount).padStart(2, "0")}.html, declare the matching count in SCENES, and use one scene page per block.
-Create exactly ${targetSceneCount} separately editable scene pages named scene-01.html, scene-02.html, etc. Their durations must add up to the complete audio/project duration. Within every scene, choreograph three or more purposeful time-based visual beats; avoid holding one composition unchanged for more than six seconds unless deliberately honoring a narration pause. Use the brief's chronology and supplied reference frames to choose relevant, specific visuals, vary framing and scale, and keep the story moving. Never insert unrelated objects or generic filler. Keep scene source compact and minified to fit the complete editable film in one response. film_html must use valid OpenFilm tracks: one or more <section> elements containing <iframe src="scene-NN.html#t=0,DURATION" at="START"></iframe>, with sequential at times and no overlaps on a track. Put image, video and sound clips on appropriate separate tracks. The viewport is 1280x720. Each page must be a complete standalone HTML document and implement window.film={duration:SECONDS,width:1280,height:720,ready:Promise...,frame(t){...}}.
+Create exactly ${targetSceneCount} separately editable scene pages named scene-01.html, scene-02.html, etc. Their durations must add up to the complete audio/project duration. Within every scene, choreograph three or more purposeful time-based visual beats; avoid holding one composition unchanged for more than six seconds unless deliberately honoring a narration pause. Use the brief's chronology and supplied reference frames to choose relevant, specific visuals, vary framing and scale, and keep the story moving. Never insert unrelated objects or generic filler. Keep scene source compact and minified to fit the complete editable film in one response. film_html must use valid OpenFilm tracks: one or more <section> elements containing <iframe src="scene-NN.html#t=0,DURATION" at="START"></iframe>, with sequential at times and no overlaps on a track. Put image, video and sound clips on appropriate separate tracks. The viewport is ${width}x${height}. Each page must be a complete standalone HTML document and implement window.film={duration:SECONDS,width:${width},height:${height},ready:Promise...,frame(t){...}}.
 Design a clear visual arc with a striking opening, varied purposeful shots, smooth scene transitions and a memorable ending. Make each scene feel art-directed: strong composition and hierarchy, considered negative space, sophisticated typography, layered depth, rich but controlled color, fine texture, lighting and detail. Favor editorial layouts and specific visual storytelling over centered text cards or generic gradients. For illustrated explainers, build original, scene-specific vector artwork with inline SVG/CSS, vivid chapter color, meaningful diagrams, timelines, device silhouettes, and subtle lighting rather than emoji or generic placeholder shapes. Do not repeat the same composition from scene to scene.
 When the image catalog is provided, use relevant real photographs from it in the film. Copy each chosen image URL exactly into the scene HTML and preserve its descriptive alt text. Never invent image URLs or filenames, never reference an unprovided assets/* path, and never leave an <img> without a valid supplied URL. If no suitable catalog image is available, create an intentional vector/CSS illustration rather than a broken image placeholder. Keep image subjects large enough to read clearly and integrate them into the composition.
 Every visible DOM layer must be individually editable and have a descriptive id. window.film.frame(t) must be deterministic and set the complete visual state for that exact time. Do not use CSS animation/keyframes, transitions, timers, requestAnimationFrame, random values, autoplay, external scripts or libraries; calculate motion directly from t. Keep scene source self-contained. Do not draw captions or transcript text. Put all sound in film.html tracks, not inside scene pages. The scene durations must sum to the full project/audio duration, within 0.1 seconds. HTML blocks must be complete documents with the exact matching HTML BEGIN/END names. Output the complete W2M/2 program only.`;
@@ -233,14 +271,17 @@ Every visible DOM layer must be individually editable and have a descriptive id.
   const referenceContext = videoReference
     ? `\n\nThe user's visual reference "${videoReference.fileName}" is ${videoReference.duration.toFixed(1)} seconds long. ${videoReference.visualDescriptions.length
       ? `Florence-2 analyzed these sampled frames locally: ${videoReference.visualDescriptions.join(" | ")}.`
-      : ""} ${attachReferenceFrames
-      ? "Three sampled frames are attached. Treat them as visual direction only: match the reference's motion-graphics craft, illustration approach, color rhythm, and visual variety while creating original scenes for the user's brief. Do not reproduce the reference's subject, wording, screenshots, or exact layouts."
+      : ""} ${attachReferenceImages
+      ? "Reference images may be attached alongside character images. Use them only for visual direction; create original scenes and do not reproduce the reference's subject, wording, screenshots, or exact layouts."
       : "The selected provider does not accept image input, so use only the local Florence-2 descriptions above; the sampled images and source video are not sent."}`
+    : "";
+  const characterContext = characterDescriptions.length
+    ? `\n\nUser-provided character reference photos analyzed locally: ${characterDescriptions.join(" | ")}. Keep recurring character traits consistent from scene to scene; create original editable artwork inspired by these descriptions.`
     : "";
   const audioContext = audioAnalysis?.has_voiceover
     ? `\n\nLocal voiceover timing analysis: audio duration ${audioAnalysis.duration?.toFixed(2) ?? voiceoverDuration?.toFixed(2) ?? "unknown"} seconds. Detected low-volume intervals (seconds): ${JSON.stringify(audioAnalysis.quiet_spans)}. The audio itself is not included in this AI request. Use the supplied intervals as concrete editing cues: place a scene transition, visual hold, or clear beat near meaningful pauses without cutting off narration; group adjacent pauses instead of making awkward rapid cuts. These are acoustic silence estimates, not speech recognition; background music can mask spoken pauses. Preserve the full audio duration exactly.`
     : "";
-  const instructions = `${common}${mediaContext}${referenceContext}${audioContext}`;
+  const instructions = `${common}${mediaContext}${referenceContext}${characterContext}${audioContext}`;
   if (!current) return `${instructions}\n\nThis is a new project. Design it from scratch with a coherent visual story and useful separate OpenFilm shots.`;
   return `${instructions}\n\nThis is an EDIT of the project already open in OpenFilm. Apply the requested change to the actual existing project. Preserve unrelated scenes, content, timings, scene filenames, track order, clip IDs, and any audio tracks. Return the complete updated project as W2M/2, not a proposal or a new unrelated film.\n\nCurrent OpenFilm project source in W2M/2:\n${formatW2MProject(current)}`;
 }
@@ -280,11 +321,30 @@ async function searchImageAssets(query: string): Promise<ImageAsset[]> {
   });
 }
 
-export default function MotionGraphicsStudio({ initialPrompt = "" }: { initialPrompt?: string }) {
+export default function MotionGraphicsStudio({
+  initialPrompt = "",
+  onOpenTfCode,
+}: {
+  initialPrompt?: string;
+  onOpenTfCode?: () => void;
+}) {
   const language = useLanguage();
   const [providers, setProviders] = useState<Provider[]>([]);
   const [providerId, setProviderId] = useState("");
-  const [topic, setTopic] = useState(initialPrompt);
+  const [topic, setTopic] = useState(() => {
+    const queuedPrompt = sessionStorage.getItem("taskflow-motion-initial-prompt-v1");
+    if (queuedPrompt) {
+      sessionStorage.removeItem("taskflow-motion-initial-prompt-v1");
+      return queuedPrompt;
+    }
+    return initialPrompt;
+  });
+  const [productionType, setProductionType] = useState<ProductionType>("cartoon");
+  const [aspectRatio, setAspectRatio] = useState<MotionAspectRatio>("16:9");
+  const [frameRate, setFrameRate] = useState(30);
+  const [requestedDuration, setRequestedDuration] = useState(30);
+  const [durationCustomized, setDurationCustomized] = useState(false);
+  const [characterReferences, setCharacterReferences] = useState<CharacterReference[]>([]);
   const [designEditPrompt, setDesignEditPrompt] = useState("");
   const [project, setProject] = useState<OpenFilmProject | null>(null);
   const [projectId, setProjectId] = useState("");
@@ -292,6 +352,9 @@ export default function MotionGraphicsStudio({ initialPrompt = "" }: { initialPr
   const [editorUrl, setEditorUrl] = useState("");
   const [editorMode, setEditorMode] = useState<"inside" | "outside">("inside");
   const [voiceover, setVoiceover] = useState<Voiceover | null>(null);
+  const [recordingVoice, setRecordingVoice] = useState(false);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const voiceStreamRef = useRef<MediaStream | null>(null);
   const [videoReference, setVideoReference] = useState<VideoReference | null>(null);
   const [processingVideoReference, setProcessingVideoReference] = useState(false);
   const [providerImageSupportByModel, setProviderImageSupportByModel] = useState<Record<string, ImageInputSupport>>({});
@@ -371,6 +434,86 @@ export default function MotionGraphicsStudio({ initialPrompt = "" }: { initialPr
     if (voiceover) URL.revokeObjectURL(voiceover.url);
   }, [voiceover]);
 
+  useEffect(() => () => {
+    recorderRef.current?.stop();
+    voiceStreamRef.current?.getTracks().forEach((track) => track.stop());
+  }, []);
+
+  async function addCharacterReferences(files?: FileList | null) {
+    if (!files?.length) return;
+    try {
+      if (characterReferences.length + files.length > 3) {
+        throw new Error("يمكن إضافة 3 صور للشخصيات كحد أقصى.");
+      }
+      const additions: CharacterReference[] = [];
+      for (const file of Array.from(files)) {
+        if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+          throw new Error("صور الشخصيات المدعومة: JPEG وPNG وWebP.");
+        }
+        if (file.size > 4 * 1024 * 1024) throw new Error("حجم صورة الشخصية يجب ألا يتجاوز 4 ميغابايت.");
+        const bitmap = await createImageBitmap(file);
+        const scale = Math.min(1, 1280 / bitmap.width, 1280 / bitmap.height);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+        canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+        const context = canvas.getContext("2d");
+        if (!context) {
+          bitmap.close();
+          throw new Error("تعذّر تجهيز صورة الشخصية.");
+        }
+        context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        bitmap.close();
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.78);
+        additions.push({ id: crypto.randomUUID(), name: file.name, dataUrl });
+      }
+      setCharacterReferences((current) => [...current, ...additions]);
+      setError("");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "تعذّرت إضافة صور الشخصيات.");
+    }
+  }
+
+  async function startVoiceRecording() {
+    if (recordingVoice) return;
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      setError("تسجيل الصوت غير مدعوم في هذا المتصفح؛ ارفع ملفًا صوتيًا بدلًا منه.");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const chunks: Blob[] = [];
+      const recorder = new MediaRecorder(stream);
+      voiceStreamRef.current = stream;
+      recorderRef.current = recorder;
+      recorder.addEventListener("dataavailable", (event) => {
+        if (event.data.size) chunks.push(event.data);
+      });
+      recorder.addEventListener("stop", () => {
+        const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
+        const extension = blob.type.includes("ogg") ? ".ogg" : ".webm";
+        const file = new File([blob], `voiceover-recording${extension}`, { type: blob.type });
+        void loadVoiceover(file).finally(() => {
+          stream.getTracks().forEach((track) => track.stop());
+          if (voiceStreamRef.current === stream) voiceStreamRef.current = null;
+          if (recorderRef.current === recorder) recorderRef.current = null;
+          setRecordingVoice(false);
+        });
+      }, { once: true });
+      recorder.start();
+      setRecordingVoice(true);
+      setError("");
+      setNotice("التسجيل بدأ؛ اضغط إيقاف عندما تنتهي.");
+    } catch (reason) {
+      voiceStreamRef.current?.getTracks().forEach((track) => track.stop());
+      voiceStreamRef.current = null;
+      setError(reason instanceof Error ? reason.message : "تعذّر بدء تسجيل الصوت.");
+    }
+  }
+
+  function stopVoiceRecording() {
+    if (recorderRef.current?.state === "recording") recorderRef.current.stop();
+  }
+
   async function saveOpenFilmProject(id: string, nextProject: OpenFilmProject, audio?: File) {
     const form = new FormData();
     form.append("project_id", id);
@@ -385,7 +528,8 @@ export default function MotionGraphicsStudio({ initialPrompt = "" }: { initialPr
   }
 
   async function openNewProject(duration: number) {
-    const initial = starterProject(topic.trim() || "MOTION AI TASKFLOW", duration);
+    const { width, height } = CANVAS_DIMENSIONS[aspectRatio];
+    const initial = starterProject(topic.trim() || "MOTION AI TASKFLOW", duration, width, height);
     let newTab: Window | null = null;
     if (editorMode === "outside") newTab = window.open("about:blank", "_blank");
     const form = new FormData();
@@ -528,7 +672,7 @@ export default function MotionGraphicsStudio({ initialPrompt = "" }: { initialPr
     try {
       if (!projectId) {
         if (savedProject) await openSavedProject();
-        else await openNewProject(voiceover?.duration ?? 30);
+        else await openNewProject(voiceover?.duration ?? requestedDuration);
       } else if (editorMode === "outside") {
         const tab = window.open(editorUrl, "_blank");
         if (tab) tab.opener = null;
@@ -580,6 +724,7 @@ export default function MotionGraphicsStudio({ initialPrompt = "" }: { initialPr
     let fullReply = continuation?.repairPrompt && !continuation.repairing ? "" : continuation?.reply ?? "";
     let attemptReply = "";
     let locallyRepairable = false;
+    let automaticRepairCount = 0;
     if (continuation?.repairPrompt && !continuation.repairing) {
       try {
         parseW2MProject(continuation.reply);
@@ -594,21 +739,28 @@ export default function MotionGraphicsStudio({ initialPrompt = "" }: { initialPr
     let message = continuation?.repairPrompt ?? continuation?.message ?? "";
     let repairPrompt = continuation?.repairPrompt;
     let compileFailure: string | null = null;
-    const attachReferenceFrames = providerImageSupport !== "no";
-    let requestImages = continuation?.images ?? (
-      videoReference && attachReferenceFrames ? videoReference.frames : []
-    );
+    const attachReferenceImages = providerImageSupport !== "no";
+    let characterDescriptions: string[] = [];
+    let requestImages = continuation?.images ?? (attachReferenceImages
+      ? [...characterReferences.map((reference) => reference.dataUrl), ...(videoReference?.frames ?? [])].slice(0, 3)
+      : []);
     const updateLog = (number: number, patch: Partial<AiResponseLog>) => {
       setAiResponses((current) => current.map((entry) => entry.attempt === number ? { ...entry, ...patch } : entry));
     };
 
     try {
       setProgress("يفتح مشروع OpenFilm الحقيقي ويقرأ نسخته الحالية...");
-      if (videoReference && providerImageSupport === "no" && !videoReference.visualDescriptions.length) {
+      if (characterReferences.length && !attachReferenceImages) {
+        characterDescriptions = await analyzeFramesWithFlorence(characterReferences.map((reference) => reference.dataUrl));
+        if (!characterDescriptions.length) {
+          throw new Error("المزوّد لا يدعم الصور، ولم يُحلّل Florence-2 صور الشخصيات. ثبّت النموذج المحلي ثم أعد المحاولة.");
+        }
+      }
+      if (videoReference && !attachReferenceImages && !videoReference.visualDescriptions.length) {
         throw new Error("هذا المزوّد لا يدعم الصور، كما أن Florence-2 المحلي لم يُحلّل الفيديو. نزّل نموذج Florence-2 من استوديو التصميم ثم أعد إرفاق الفيديو.");
       }
       if (!activeProjectId) {
-        const opened = await openNewProject(voiceover?.duration ?? 30);
+        const opened = await openNewProject(voiceover?.duration ?? requestedDuration);
         activeProjectId = opened.projectId;
       }
       const requestProject = await fetchProject(activeProjectId);
@@ -622,11 +774,18 @@ export default function MotionGraphicsStudio({ initialPrompt = "" }: { initialPr
         voiceover?.duration,
         audioAnalysis,
         videoReference ?? undefined,
-        attachReferenceFrames,
+        characterDescriptions,
+        requestImages.length > 0,
+        productionType,
+        aspectRatio,
+        frameRate,
+        requestedDuration,
+        durationCustomized,
       );
       if (!continuation) fullReply = "";
 
       while (!locallyRepairable) {
+        compileFailure = null;
         attempt += 1;
         attemptReply = "";
         setAiResponses((current) => [...current, { attempt, status: "يحرر صفحات OpenFilm...", reply: "" }]);
@@ -653,17 +812,30 @@ export default function MotionGraphicsStudio({ initialPrompt = "" }: { initialPr
           }),
         });
         let response = await sendPrompt(prompt, requestImages);
-        if (!response.ok && requestImages.length && videoReference?.visualDescriptions.length &&
+        if (!response.ok && requestImages.length &&
           [400, 415, 422].includes(response.status)) {
           const firstFailure = await response.text();
-          const fallbackContext = `The provider rejected image input. Use only these Florence-2 descriptions generated locally; no image data is attached:\n${videoReference.visualDescriptions.join("\n")}`;
-          requestImages = [];
-          message = `${message}\n\n${fallbackContext}`;
-          setNotice("لم يقبل المزوّد صور الفيديو؛ أُعيد الطلب باستخدام أوصاف Florence-2 المحلية فقط.");
-          response = await sendPrompt(`${prompt}\n\n${fallbackContext}`, requestImages);
-          if (!response.ok || !response.body) {
-            const detail = await response.text();
-            throw new Error(`تعذر الاتصال بمزوّد AI (${response.status}): ${detail.slice(0, 500)}. الرد الأول: ${firstFailure.slice(0, 240)}`);
+          try {
+            if (!characterDescriptions.length && characterReferences.length) {
+              characterDescriptions = await analyzeFramesWithFlorence(characterReferences.map((reference) => reference.dataUrl));
+            }
+            const localDescriptions = [
+              ...(videoReference?.visualDescriptions ?? []),
+              ...characterDescriptions,
+            ];
+            if (localDescriptions.length) {
+              const fallbackContext = `The provider rejected image input. Use only these locally generated Florence-2 descriptions; no image data is attached:\n${localDescriptions.join("\n")}`;
+              requestImages = [];
+              message = `${message}\n\n${fallbackContext}`;
+              setNotice("لم يقبل المزوّد الصور؛ أُعيد الطلب باستخدام أوصاف Florence-2 المحلية فقط.");
+              response = await sendPrompt(`${prompt}\n\n${fallbackContext}`, requestImages);
+              if (!response.ok || !response.body) {
+                const detail = await response.text();
+                throw new Error(`تعذر الاتصال بمزوّد AI (${response.status}): ${detail.slice(0, 500)}. الرد الأول: ${firstFailure.slice(0, 240)}`);
+              }
+            }
+          } catch (reason) {
+            if (requestImages.length) throw reason;
           }
         }
         if (!response.ok || !response.body) {
@@ -737,8 +909,9 @@ export default function MotionGraphicsStudio({ initialPrompt = "" }: { initialPr
           parseW2MProject(fullReply);
         } catch (reason) {
           compileFailure = reason instanceof Error ? reason.message : "تعذر ترجمة برنامج W2M.";
-          if (!continuation?.repairPrompt && attempt === 1) {
-            repairPrompt = `The complete W2M/2 source below failed compilation. Repair every error and return the entire corrected W2M/2 program only. Preserve the intended project and all valid content. Do not explain.\n\nCOMPILER DIAGNOSTICS:\n${compileFailure}\n\nSOURCE TO REPAIR:\n${fullReply}`;
+          if (automaticRepairCount < MAX_AUTOMATIC_W2M_REPAIRS) {
+            automaticRepairCount += 1;
+            repairPrompt = w2mRepairPrompt(compileFailure, fullReply);
             message = repairPrompt;
             fullReply = "";
             setError("");
@@ -778,7 +951,7 @@ export default function MotionGraphicsStudio({ initialPrompt = "" }: { initialPr
       setError(detail);
       if (fullReply.trim() || repairPrompt) {
         if (compileFailure) {
-          repairPrompt = `The complete W2M/2 source below failed compilation. Repair every error and return the entire corrected W2M/2 program only. Preserve the intended project and all valid content. Do not explain.\n\nCOMPILER DIAGNOSTICS:\n${compileFailure}\n\nSOURCE TO REPAIR:\n${fullReply}`;
+          repairPrompt = w2mRepairPrompt(compileFailure, fullReply);
           setPendingContinuation({
             providerId: requestProviderId,
             message,
@@ -813,12 +986,17 @@ export default function MotionGraphicsStudio({ initialPrompt = "" }: { initialPr
   return (
     <section className="motion-studio" dir={language === "ar" ? "rtl" : "ltr"}>
       <header className="motion-heading">
-        <div className="motion-icon"><Clapperboard size={22} /></div>
-        <div>
-          <span>{translate("استوديو إنشاء الفيديو", language)}</span>
-          <h2>OPENFILM-AI TASKFLOW EDITION</h2>
-          <p>{translate("OpenFilm هو المحرر الوحيد. الذكاء الاصطناعي ينشئ ويعدّل ملفات مشروعه المفتوح مباشرة؛ لا يوجد محرك معاينة أو Timeline بديل.", language)}</p>
+        <div className="motion-heading-copy">
+          <div className="motion-icon"><Clapperboard size={22} /></div>
+          <div>
+            <span>{translate("استوديو إنشاء الفيديو", language)}</span>
+            <h2>OPENFILM-AI TASKFLOW EDITION</h2>
+            <p>{translate("OpenFilm هو المحرر الوحيد. الذكاء الاصطناعي ينشئ ويعدّل ملفات مشروعه المفتوح مباشرة؛ لا يوجد محرك معاينة أو Timeline بديل.", language)}</p>
+          </div>
         </div>
+        {onOpenTfCode && <button className="motion-tf-code-link" type="button" onClick={onOpenTfCode}>
+          <Code2 size={16} aria-hidden="true" />{translate("افتح TF CODE", language)}
+        </button>}
       </header>
 
       <div className="motion-workspace">
@@ -829,6 +1007,85 @@ export default function MotionGraphicsStudio({ initialPrompt = "" }: { initialPr
               {providers.map((provider) => <option key={provider.id} value={provider.id}>{provider.name} · {provider.model}</option>)}
             </select>
           </label>
+          <section className="motion-production-setup" aria-label={translate("إعدادات إنتاج الفيديو", language)}>
+            <label><span>{translate("نوع الإنتاج", language)}</span>
+              <select value={productionType} disabled={generating || Boolean(pendingContinuation)}
+                onChange={(event) => {
+                  if (isProductionType(event.target.value)) setProductionType(event.target.value);
+                }}>
+                <option value="cartoon">{translate("فيلم كرتوني", language)}</option>
+                <option value="tutorial">{translate("درس تعليمي", language)}</option>
+                <option value="story">{translate("قصة مرئية", language)}</option>
+                <option value="advertisement">{translate("إعلان", language)}</option>
+              </select>
+            </label>
+            <div className="motion-output-grid">
+              <label><span>{translate("مقاس الفيديو", language)}</span>
+                <select value={aspectRatio} disabled={generating || Boolean(pendingContinuation)}
+                  onChange={(event) => {
+                    if (isMotionAspectRatio(event.target.value)) setAspectRatio(event.target.value);
+                  }}>
+                  <option value="16:9">16:9 · YouTube</option>
+                  <option value="9:16">9:16 · Reels / TikTok</option>
+                  <option value="1:1">1:1 · مربع</option>
+                </select>
+              </label>
+              <label><span>{translate("المدة المطلوبة", language)}</span>
+                <select value={requestedDuration} disabled={generating || Boolean(pendingContinuation) || Boolean(voiceover)}
+                  onChange={(event) => {
+                    setRequestedDuration(Number(event.target.value));
+                    setDurationCustomized(true);
+                  }}>
+                  <option value={20}>20 {translate("ثانية", language)}</option>
+                  <option value={30}>30 {translate("ثانية", language)}</option>
+                  <option value={50}>50 {translate("ثانية", language)}</option>
+                  <option value={60}>1 {translate("دقيقة", language)}</option>
+                  <option value={120}>2 {translate("دقيقتان", language)}</option>
+                  <option value={180}>3 {translate("دقائق", language)}</option>
+                </select>
+              </label>
+            </div>
+            <label><span>{translate("معدل الإطارات", language)}</span>
+              <select value={frameRate} disabled={generating || Boolean(pendingContinuation)}
+                onChange={(event) => setFrameRate(Number(event.target.value))}>
+                <option value={24}>24 fps · سينمائي</option>
+                <option value={30}>30 fps · قياسي</option>
+              </select>
+            </label>
+            <small>{voiceover
+              ? translate("مدة الفويس أوفر المرفق هي التي تضبط مدة المشروع.", language)
+              : translate("معدل الإطارات يوجّه توقيت الحركة؛ اضبط معدل التشغيل/التصدير أيضًا من OpenFilm.", language)}</small>
+          </section>
+          <section className="motion-character-board" aria-label={translate("صور الشخصيات المرجعية", language)}>
+            <div className="motion-character-heading">
+              <strong><ImagePlus size={16} aria-hidden="true" />{translate("الشخصيات المرجعية", language)}</strong>
+              <small>{translate("ارفع حتى 3 صور لتوجيه شكل الشخصيات واستمراريتها بين المشاهد.", language)}</small>
+            </div>
+            <label className="motion-character-upload">
+              <ImagePlus size={16} aria-hidden="true" />
+              {translate("أضف صور الشخصيات", language)}
+              <input type="file" accept="image/jpeg,image/png,image/webp" multiple
+                disabled={generating || Boolean(pendingContinuation) || characterReferences.length >= 3}
+                onChange={(event) => {
+                  void addCharacterReferences(event.currentTarget.files);
+                  event.currentTarget.value = "";
+                }} />
+            </label>
+            {characterReferences.length > 0 && <div className="motion-character-list">
+              {characterReferences.map((character) => <article key={character.id}>
+                <img src={character.dataUrl} alt={character.name} />
+                <span title={character.name}>{character.name}</span>
+                <button type="button" aria-label={`${translate("إزالة", language)} ${character.name}`}
+                  disabled={generating || Boolean(pendingContinuation)}
+                  onClick={() => setCharacterReferences((current) => current.filter((item) => item.id !== character.id))}>
+                  <Trash2 size={14} aria-hidden="true" />
+                </button>
+              </article>)}
+            </div>}
+            <small>{providerImageSupport === "no"
+              ? translate("يحلل Florence-2 الصور محليًا؛ لا تُرسل ملفات الصور لهذا المزوّد.", language)
+              : translate("تُرسل صور التوجيه إلى مزوّد AI المختار لتوليد المشاهد؛ لا تُرفع إلى مكتبة عامة.", language)}</small>
+          </section>
           <label><span>{project ? translate("طلب تعديل المشروع المفتوح", language) : translate("فكرة الفيلم", language)}</span>
             <textarea value={topic} onChange={(event) => setTopic(event.target.value)} rows={5}
               placeholder={translate("صف الفكرة والجمهور والأسلوب البصري. سيبني AI مشاهد HTML أصلية قابلة للتحرير في OpenFilm.", language)} />
@@ -874,6 +1131,12 @@ export default function MotionGraphicsStudio({ initialPrompt = "" }: { initialPr
             <span>{voiceover ? translate(`${voiceover.file.name} · ${voiceover.duration.toFixed(1)} ثانية`, language) : translate("إرفاق فويس أوفر بمسار OpenFilm", language)}</span>
             <input type="file" accept="audio/*" onChange={(event) => void loadVoiceover(event.target.files?.[0])} />
           </label>
+          <button type="button" className={`motion-record-button${recordingVoice ? " recording" : ""}`}
+            onClick={() => recordingVoice ? stopVoiceRecording() : void startVoiceRecording()}
+            disabled={generating || Boolean(pendingContinuation)}>
+            {recordingVoice ? <Square size={15} aria-hidden="true" /> : <Mic size={16} aria-hidden="true" />}
+            {recordingVoice ? translate("إيقاف تسجيل الصوت", language) : translate("سجّل التعليق بصوتك", language)}
+          </button>
           {voiceover && <div className="motion-voiceover"><Headphones size={17} /><span><strong>{voiceover.file.name}</strong><small>{translate("يُحلّل محليًا لاكتشاف فترات الصوت المنخفضة؛ لا يُرسل الصوت إلى مزوّد AI.", language)}</small></span></div>}
           <button className="motion-generate" type="button" onClick={() => void generate()} disabled={!providerId || !topic.trim() || generating || processingVideoReference}>
             {generating ? <LoaderCircle className="motion-spin" /> : <Sparkles size={18} />}

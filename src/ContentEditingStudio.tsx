@@ -4,7 +4,9 @@ import {
   Captions,
   Check,
   Clapperboard,
+  Code2,
   Download,
+  ExternalLink,
   Film,
   ImagePlus,
   LoaderCircle,
@@ -214,6 +216,8 @@ const COPY: Record<string, string> = {
   "لم يصل رد نصي من المزوّد.": "The provider returned no text.",
   "خطة المشاهد": "Scene plan",
   "إرسال الخطة إلى استوديو OpenFilm": "Send the plan to OpenFilm Studio",
+  "افتح الخطة في OpenFilm": "Open the plan in OpenFilm",
+  "افتح TF CODE": "Open TF CODE",
   "سطر الترجمة": "Caption track",
   "مسار التعليق الصوتي": "Voice-over track",
   "مشاهد مرئية": "Visual scenes",
@@ -232,7 +236,13 @@ function ratioForPlatform(platform: string): AspectRatio {
   return "9:16";
 }
 
-export default function ContentEditingStudio() {
+export default function ContentEditingStudio({
+  onOpenMotion,
+  onOpenTfCode,
+}: {
+  onOpenMotion?: (prompt: string) => void;
+  onOpenTfCode?: () => void;
+}) {
   const language = useLanguage();
   const [providers, setProviders] = useState<Provider[]>([]);
   const [providerId, setProviderId] = useState("");
@@ -595,8 +605,19 @@ export default function ContentEditingStudio() {
   return (
     <section className="content-editing-studio" dir={language === "ar" ? "rtl" : "ltr"}>
       <header className="content-editing-heading">
-        <span className="content-editing-heading-icon"><Clapperboard size={23} /></span>
-        <div><h1>{tr("مونتاج المحتوى", language)}</h1><p>{tr("من الفكرة إلى تسلسل مشاهد جاهز للتحرير.", language)}</p></div>
+        <div className="content-editing-heading-copy">
+          <span className="content-editing-heading-icon"><Clapperboard size={23} /></span>
+          <div><h1>{tr("مونتاج المحتوى", language)}</h1><p>{tr("من الفكرة إلى تسلسل مشاهد جاهز للتحرير.", language)}</p></div>
+        </div>
+        <div className="content-editing-heading-actions">
+          {onOpenMotion && <button className="content-editing-open-motion" type="button"
+            onClick={() => onOpenMotion(`${idea.trim()}\n\nخطة المونتاج الحالية:\n${plan}`.trim())}>
+            <Film size={16} aria-hidden="true" />{tr("إرسال الخطة إلى استوديو OpenFilm", language)}
+          </button>}
+          {onOpenTfCode && <button className="content-editing-open-code" type="button" onClick={onOpenTfCode}>
+            <Code2 size={16} aria-hidden="true" />{tr("افتح TF CODE", language)}
+          </button>}
+        </div>
       </header>
 
       <div className="content-editing-grid">
@@ -812,6 +833,10 @@ export default function ContentEditingStudio() {
             </div>
             <div className="content-editing-script"><p>{plan}</p></div>
             <div className="content-editing-openfilm-note"><Play size={15} />{tr("تُستخدم الصور المرفوعة كمراجع للخطة فقط. لإضافة الفيديوهات نفسها، افتح المحرر وأرفق الوسائط التي تملكها.", language)}</div>
+            {onOpenMotion && <button className="content-editing-open-motion content-editing-open-motion-result" type="button"
+              onClick={() => onOpenMotion(`${idea.trim()}\n\nخطة المونتاج الحالية:\n${plan}`.trim())}>
+              <ExternalLink size={16} aria-hidden="true" />{tr("افتح الخطة في OpenFilm", language)}
+            </button>}
             {voiceoverUrl && <a className="content-editing-audio-download" href={voiceoverUrl} download="taskflow-voiceover.wav">
               <Download size={16} />{tr("تنزيل التعليق الصوتي", language)}
             </a>}

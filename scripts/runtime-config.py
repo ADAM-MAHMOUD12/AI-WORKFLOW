@@ -8,7 +8,6 @@ PORT_RANGES = {
     "api": (8000, 8099),
     "engine2d": (5174, 5273),
     "engine3d": (3002, 3101),
-    "theia": (3102, 3201),
     "frontend": (5173, 5272),
 }
 
@@ -56,16 +55,16 @@ args = parser.parse_args()
 if args.command == "discover":
     ports = choose_ports()
     print("|".join((str(ports["api"]), str(ports["frontend"]), str(ports["engine3d"]),
-                    str(ports["engine2d"]), str(ports["theia"]), local_ip())))
+                    str(ports["engine2d"]), local_ip())))
 else:
-    if len(args.ports) != 5:
-        raise SystemExit("write requires API, frontend, 3D, 2D, and Theia ports.")
-    api, frontend, engine3d, engine2d, theia = (int(port) for port in args.ports)
-    if any(not 1 <= port <= 65535 for port in (api, frontend, engine3d, engine2d, theia)):
+    if len(args.ports) != 4:
+        raise SystemExit("write requires API, frontend, 3D, and 2D ports.")
+    api, frontend, engine3d, engine2d = (int(port) for port in args.ports)
+    if any(not 1 <= port <= 65535 for port in (api, frontend, engine3d, engine2d)):
         raise SystemExit("Port values must be between 1 and 65535.")
     output = Path(__file__).resolve().parents[1] / "dist" / "taskflow-runtime.js"
     output.parent.mkdir(parents=True, exist_ok=True)
-    values = {"api": api, "frontend": frontend, "engine3d": engine3d, "engine2d": engine2d, "theia": theia}
+    values = {"api": api, "frontend": frontend, "engine3d": engine3d, "engine2d": engine2d}
     output.write_text(
         f"window.TASKFLOW_PORTS=Object.freeze({json.dumps(values, separators=(',', ':'))});\n",
         encoding="utf-8",

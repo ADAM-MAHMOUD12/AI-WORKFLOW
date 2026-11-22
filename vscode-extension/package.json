@@ -1,0 +1,52 @@
+{
+  "name": "taskflow-vscode-bridge",
+  "displayName": "TF CODE Agent Bridge",
+  "description": "Connects the TaskFlow web agent to the active VS Code workspace.",
+  "version": "1.3.1",
+  "publisher": "taskflow",
+  "scripts": {
+    "test": "node --test actionProtocol.test.js"
+  },
+  "engines": {
+    "vscode": "^1.93.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "onView:taskflow.chat"
+  ],
+  "icon": "resources/taskflow.svg",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "taskflow",
+          "title": "TF CODE",
+          "icon": "resources/taskflow.svg"
+        }
+      ]
+    },
+    "views": {
+      "taskflow": [
+        {
+          "id": "taskflow.chat",
+          "name": "Chat",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "taskflow.openBridgePanel",
+        "title": "TF CODE: Open Connection Panel"
+      },
+      {
+        "command": "taskflow.openChatView",
+        "title": "TF CODE: Open Chat"
+      }
+    ]
+  },
+  "main": "./extension.js"
+}

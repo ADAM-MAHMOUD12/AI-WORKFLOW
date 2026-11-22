@@ -7,7 +7,9 @@ import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
 import { bindViewContribution, AbstractViewContribution } from '@theia/core/lib/browser/shell/view-contribution';
 import { FileService } from '@theia/filesystem/lib/browser/file-service';
 import { PluginServer } from '@theia/plugin-ext/lib/common/plugin-protocol';
+import { HostedPluginSupport } from '@theia/plugin-ext/lib/hosted/browser/hosted-plugin';
 import { WorkspaceService } from '@theia/workspace/lib/browser/workspace-service';
+import { analyzeVscodeExtensionManifest, isExtensionCompatible } from './taskflow-vscode-compatibility.js';
 import './taskflow-appearance.css';
 
 const CATALOG_URL = 'https://raw.githubusercontent.com/ADAM-MAHMOUD12/AI-TASKFLOW-CODE-THEMES-EXTENSIONS/main/catalog.json';
@@ -309,6 +311,79 @@ function isOpenVsxApiUrl(value, expectedExtension) {
     }
 }
 
+async function fetchCompatibleOpenVsxExtensions(searchText, offset, signal) {
+    const pageSize = 24;
+    const params = new URLSearchParams({
+        size: String(pageSize),
+        offset: String(offset),
+        sortBy: 'downloadCount',
+        sortOrder: 'desc'
+    });
+    if (searchText.trim()) {
+        params.set('query', searchText.trim().slice(0, 100));
+    }
+    const response = await fetch(`${OPEN_VSX_API_URL}/-/search?${params}`, {
+        signal,
+        headers: { Accept: 'application/json' }
+    });
+    if (!response.ok) {
+        throw new Error(`تعذّر البحث في Open VSX (HTTP ${response.status}).`);
+    }
+    const result = await response.json();
+    if (!Array.isArray(result.extensions) || !Number.isFinite(result.totalSize)) {
+        throw new Error('أعاد Open VSX نتائج غير صالحة.');
+    }
+    const checks = await Promise.all(result.extensions.map(async entry => {
+        if (!entry || typeof entry.namespace !== 'string' || typeof entry.name !== 'string' ||
+            typeof entry.version !== 'string' ||
+            !/^[a-z0-9._-]+$/i.test(entry.namespace) ||
+            !/^[a-z0-9._-]+$/i.test(entry.name) ||
+            !/^[a-z0-9.+_-]+$/i.test(entry.version)) {
+            return null;
+        }
+        const metadataResponse = await fetch(
+            `${OPEN_VSX_API_URL}/${encodeURIComponent(entry.namespace)}/${encodeURIComponent(entry.name)}/${encodeURIComponent(entry.version)}`,
+            { signal, headers: { Accept: 'application/json' } }
+        );
+        if (!metadataResponse.ok) {
+            return null;
+        }
+        const metadata = await metadataResponse.json();
+        if (!metadata || !isOpenVsxApiUrl(metadata.files?.manifest, '.json') ||
+            !isOpenVsxApiUrl(metadata.files?.download, '.vsix')) {
+            return null;
+        }
+        const manifestResponse = await fetch(metadata.files.manifest, {
+            signal,
+            headers: { Accept: 'application/json' }
+        });
+        if (!manifestResponse.ok) {
+            return null;
+        }
+        const manifest = await manifestResponse.json();
+        const compatibility = analyzeVscodeExtensionManifest(manifest);
+        if (!isExtensionCompatible(manifest)) {
+            return null;
+        }
+        return {
+            id: `${entry.namespace}.${entry.name}`,
+            name: typeof metadata.displayName === 'string' ? metadata.displayName : entry.name,
+            description: typeof metadata.description === 'string' ? metadata.description : '',
+            namespace: entry.namespace,
+            version: entry.version,
+            downloadUrl: metadata.files.download,
+            openVsxUrl: `https://open-vsx.org/extension/${encodeURIComponent(entry.namespace)}/${encodeURIComponent(entry.name)}`,
+            downloads: Number.isFinite(metadata.downloadCount) ? metadata.downloadCount : 0,
+            compatibility
+        };
+    }));
+    return {
+        extensions: checks.filter(Boolean),
+        totalSize: result.totalSize,
+        hasMore: offset + result.extensions.length < result.totalSize
+    };
+}
+
 function OpenVsxThemeLibrary({ pluginServer }) {
     const [themes, setThemes] = React.useState([]);
     const [query, setQuery] = React.useState('');
@@ -502,6 +577,7 @@ function validateCatalog(value, assetPrefix = RAW_ASSET_PREFIX) {
             typeof item.name === 'string' && item.name.length <= 80 &&
             typeof item.description === 'string' && item.description.length <= 500 &&
             typeof item.asset === 'string' &&
+            (item.manifest === undefined || isRecord(item.manifest)) &&
             (item.author === undefined || (typeof item.author === 'string' && item.author.length <= 80)) &&
             (item.readme === undefined || (
                 typeof item.readme === 'string' && item.readme.startsWith(`${kind}/`) &&
@@ -879,29 +955,23 @@ function TaskflowSkillLibraries({ fileService, workspaceService }) {
 
     React.useEffect(() => {
         let active = true;
-        const base = typeof window.taskflowApiBase === 'string' ? window.taskflowApiBase : '';
-        setApiBase(base);
-        void fetch(TASKFLOW_SKILL_REPOSITORY.catalogUrl, {
-            headers: { Accept: 'application/json' }
-        }).then(async response => {
-            if (!response.ok) {
-                throw new Error(`تعذّر تحميل مكتبة TaskFlow Skills (HTTP ${response.status}).`);
+        let platformRequestController;
+        const loadPlatformLibraries = () => {
+            const base = typeof window.taskflowApiBase === 'string' ? window.taskflowApiBase : '';
+            if (!base) {
+                return;
             }
-            return validateCatalog(await response.json(), TASKFLOW_SKILL_REPOSITORY.assetPrefix);
-        }).then(catalog => {
-            if (active) setTaskflowSkills(catalog.skills);
-        }).catch(fetchError => {
-            if (active) setError(fetchError instanceof Error ? fetchError.message : 'تعذّر تحميل مكتبة TaskFlow Skills.');
-        }).finally(() => {
-            if (active) setLoadingTaskflow(false);
-        });
+            setApiBase(base);
+            setError('');
+            setLoadingPopular(true);
+            platformRequestController?.abort();
+            const controller = new AbortController();
+            platformRequestController = controller;
+            const requestHeaders = { ...taskflowSessionHeaders(), Accept: 'application/json' };
 
-        if (!base) {
-            setError('اتصل بمنصة TaskFlow لعرض مكتبة المهارات المشتركة.');
-            setLoadingPopular(false);
-        } else {
             void fetch(`${base.replace(/\/+$/, '')}${TASKFLOW_APP_DATA_URL}`, {
-                headers: { ...taskflowSessionHeaders(), Accept: 'application/json' }
+                signal: controller.signal,
+                headers: requestHeaders
             }).then(async response => {
                 if (!response.ok) {
                     throw new Error(`تعذّر تحميل مهارات حساب TaskFlow (${response.status}).`);
@@ -918,10 +988,14 @@ function TaskflowSkillLibraries({ fileService, workspaceService }) {
                     typeof item.template === 'string'
                 ));
             }).catch(fetchError => {
-                if (active) setError(fetchError instanceof Error ? fetchError.message : 'تعذّر تحميل مهارات الحساب.');
+                if (active && fetchError?.name !== 'AbortError') {
+                    setError(fetchError instanceof Error ? fetchError.message : 'تعذّر تحميل مهارات الحساب.');
+                }
             });
+
             void fetch(`${base.replace(/\/+$/, '')}${TASKFLOW_SKILLS_API_URL}/popular`, {
-                headers: { ...taskflowSessionHeaders(), Accept: 'application/json' }
+                signal: controller.signal,
+                headers: requestHeaders
             }).then(async response => {
                 const result = await response.json();
                 if (!response.ok) {
@@ -934,12 +1008,42 @@ function TaskflowSkillLibraries({ fileService, workspaceService }) {
                 }
                 if (active) setPopularSkills(result.skills);
             }).catch(fetchError => {
-                if (active) setError(fetchError instanceof Error ? fetchError.message : 'تعذّر الاتصال بمكتبة skills.sh.');
+                if (active && fetchError?.name !== 'AbortError') {
+                    setPopularSkills([]);
+                    setError(fetchError instanceof Error ? fetchError.message : 'تعذّر الاتصال بمكتبة skills.sh.');
+                }
             }).finally(() => {
-                if (active) setLoadingPopular(false);
+                if (active && !controller.signal.aborted) setLoadingPopular(false);
             });
+        };
+        const onPlatformInitialized = () => loadPlatformLibraries();
+        window.addEventListener('taskflow:platform-initialized', onPlatformInitialized);
+        void fetch(TASKFLOW_SKILL_REPOSITORY.catalogUrl, {
+            headers: { Accept: 'application/json' }
+        }).then(async response => {
+            if (!response.ok) {
+                throw new Error(`تعذّر تحميل مكتبة TaskFlow Skills (HTTP ${response.status}).`);
+            }
+            return validateCatalog(await response.json(), TASKFLOW_SKILL_REPOSITORY.assetPrefix);
+        }).then(catalog => {
+            if (active) setTaskflowSkills(catalog.skills);
+        }).catch(fetchError => {
+            if (active) setError(fetchError instanceof Error ? fetchError.message : 'تعذّر تحميل مكتبة TaskFlow Skills.');
+        }).finally(() => {
+            if (active) setLoadingTaskflow(false);
+        });
+
+        if (typeof window.taskflowApiBase !== 'string' || !window.taskflowApiBase) {
+            setError('اتصل بمنصة TaskFlow لعرض مكتبة المهارات المشتركة.');
+            setLoadingPopular(false);
+        } else {
+            loadPlatformLibraries();
         }
-        return () => { active = false; };
+        return () => {
+            active = false;
+            platformRequestController?.abort();
+            window.removeEventListener('taskflow:platform-initialized', onPlatformInitialized);
+        };
     }, []);
 
     const searchPopular = async event => {
@@ -1943,21 +2047,46 @@ function TaskflowAppearancePanel({ pluginServer, fileService, workspaceService, 
     );
 }
 
-function TaskflowExtensionMarketplace({ pluginServer, commandRegistry, onSourceChange, initialSource }) {
+function TaskflowExtensionMarketplace({ pluginServer, hostedPluginSupport, commandRegistry, onSourceChange, initialSource }) {
     const [source, setSource] = React.useState(activeExtensionSource);
     const [extensions, setExtensions] = React.useState([]);
+    const [openVsxExtensions, setOpenVsxExtensions] = React.useState([]);
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState('');
     const [notice, setNotice] = React.useState('');
     const [busyId, setBusyId] = React.useState('');
     const [query, setQuery] = React.useState('');
     const [readmePreviews, setReadmePreviews] = React.useState({});
+    const [openVsxOffset, setOpenVsxOffset] = React.useState(0);
+    const [openVsxHasMore, setOpenVsxHasMore] = React.useState(false);
 
     React.useEffect(() => {
         setSource(initialSource);
     }, [initialSource]);
 
     React.useEffect(() => {
+        if (source === EXTENSION_SOURCE_OPEN_VSX) {
+            const controller = new AbortController();
+            setOpenVsxExtensions([]);
+            setError('');
+            setLoading(true);
+            void fetchCompatibleOpenVsxExtensions('', 0, controller.signal).then(result => {
+                setOpenVsxExtensions(result.extensions);
+                setOpenVsxOffset(0);
+                setOpenVsxHasMore(result.hasMore);
+            }).catch(fetchError => {
+                if (fetchError?.name !== 'AbortError') {
+                    setOpenVsxExtensions([]);
+                    setError(fetchError instanceof Error ? fetchError.message : 'تعذّر تحميل الإضافات المتوافقة.');
+                    console.error('Open VSX compatibility search failed.', fetchError);
+                }
+            }).finally(() => {
+                if (!controller.signal.aborted) {
+                    setLoading(false);
+                }
+            });
+            return () => controller.abort();
+        }
         if (source !== EXTENSION_SOURCE_TASKFLOW) {
             setExtensions([]);
             setError('');
@@ -1995,7 +2124,26 @@ function TaskflowExtensionMarketplace({ pluginServer, commandRegistry, onSourceC
         return () => controller.abort();
     }, [source]);
 
+    const searchOpenVsx = async (searchText = query, offset = 0, append = false) => {
+        setLoading(true);
+        setError('');
+        try {
+            const result = await fetchCompatibleOpenVsxExtensions(searchText, offset);
+            setOpenVsxExtensions(current => append ? [...current, ...result.extensions] : result.extensions);
+            setOpenVsxOffset(offset);
+            setOpenVsxHasMore(result.hasMore);
+        } catch (searchError) {
+            setError(searchError instanceof Error ? searchError.message : 'تعذّر تحميل الإضافات المتوافقة.');
+            if (!append) {
+                setOpenVsxExtensions([]);
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const filteredExtensions = extensions.filter(item =>
+        item.manifest && isExtensionCompatible(item.manifest) &&
         `${item.name} ${item.description} ${item.author ?? ''}`.toLocaleLowerCase()
             .includes(query.trim().toLocaleLowerCase())
     );
@@ -2010,7 +2158,38 @@ function TaskflowExtensionMarketplace({ pluginServer, commandRegistry, onSourceC
             await pluginServer.install(assetPath(item, 'extensions', TASKFLOW_EXTENSION_REPOSITORY.assetPrefix));
             setNotice(`تم تثبيت ${item.name}. قد تحتاج إلى إعادة تحميل المحرر لتفعيلها.`);
         } catch (installError) {
-            setNotice(installError instanceof Error ? installError.message : 'تعذّر تثبيت الإضافة.');
+            const detail = installError instanceof Error ? installError.message : 'تعذّر تثبيت الإضافة.';
+            setNotice(`جرّب المحرر تشغيل الإضافة بالتوافق المتاح، لكن التثبيت أو التفعيل لم ينجح: ${detail} سنقيّم دعمها لاحقًا.`);
+        } finally {
+            setBusyId('');
+        }
+    };
+
+    const installOpenVsxExtension = async item => {
+        if (!window.confirm(`تثبيت ${item.name}؟ ستعمل الإضافة داخل المحرر وقد تصل إلى مساحة العمل.`)) {
+            return;
+        }
+        setBusyId(item.id);
+        setNotice('');
+        try {
+            await pluginServer.install(item.downloadUrl);
+            if (item.compatibility.status === 'translation-required') {
+                try {
+                    await Promise.all(item.compatibility.activationEvents.map(event =>
+                        hostedPluginSupport.activateByEvent(event)
+                    ));
+                } catch (translationError) {
+                    const detail = translationError instanceof Error ? translationError.message : 'تعذّر تفعيل مسار التوافق.';
+                    setNotice(`ثُبّتت ${item.name}، لكن محاولة ترجمة حدث التفعيل لم تنجح: ${detail} دعم هذا الحدث غير مكتمل وسنقيّمه لاحقًا.`);
+                    return;
+                }
+                setNotice(`ثُبّتت ${item.name} وفُعّل مسار التوافق البديل لحدث التفعيل. هذا لا يضمن عمل كل الوظائف؛ قد تحتاج إلى إعادة تحميل المحرر.`);
+            } else {
+                setNotice(`تم تثبيت ${item.name} (${item.version}). اجتاز فحص توافق بياناته، لكن لا يمكن ضمان توافق كل وظائفه. قد تحتاج إلى إعادة تحميل المحرر.`);
+            }
+        } catch (installError) {
+            const detail = installError instanceof Error ? installError.message : 'تعذّر تثبيت الإضافة.';
+            setNotice(`حاول المحرر تثبيت الإضافة، لكن المحاولة لم تنجح: ${detail} هذه الوظيفة غير مدعومة حاليًا وسنقيّم إضافتها لاحقًا.`);
         } finally {
             setBusyId('');
         }
@@ -2062,7 +2241,7 @@ function TaskflowExtensionMarketplace({ pluginServer, commandRegistry, onSourceC
     };
 
     return React.createElement('section', {
-        className: `taskflow-extension-marketplace ${source === EXTENSION_SOURCE_TASKFLOW ? 'taskflow-extension-source-active' : 'taskflow-extension-switch-only'}`,
+        className: `taskflow-extension-marketplace ${source === EXTENSION_SOURCE_TASKFLOW ? 'taskflow-extension-source-active' : ''}`,
         'aria-label': 'مصادر الإضافات'
     },
     React.createElement('label', { className: 'taskflow-extension-source-select' },
@@ -2074,6 +2253,70 @@ function TaskflowExtensionMarketplace({ pluginServer, commandRegistry, onSourceC
         },
         React.createElement('option', { value: EXTENSION_SOURCE_OPEN_VSX }, 'Open VSX Registry'),
         React.createElement('option', { value: EXTENSION_SOURCE_TASKFLOW }, 'AI TaskFlow Extensions'))
+    ),
+    source === EXTENSION_SOURCE_OPEN_VSX && React.createElement('div', { className: 'taskflow-extension-catalog' },
+    React.createElement('form', {
+        className: 'taskflow-extension-search',
+        onSubmit: event => {
+            event.preventDefault();
+            void searchOpenVsx(query);
+        }
+    },
+    React.createElement('span', null, 'بحث عن الإضافات المتوافقة فقط'),
+    React.createElement('input', {
+        type: 'search',
+        value: query,
+        maxLength: 100,
+        onChange: event => setQuery(event.currentTarget.value),
+        placeholder: 'اسم الإضافة أو وصفها',
+        'aria-label': 'بحث في إضافات Open VSX المتوافقة'
+    }),
+    React.createElement('button', { type: 'submit', disabled: loading },
+        loading ? 'جارٍ البحث...' : 'بحث'
+    )),
+    React.createElement('p', { className: 'taskflow-appearance-description' },
+        'تُفحص بيانات VS Code لكل إضافة، ولا تظهر إلا الإضافات التي تتوافق متطلباتها المعلنة مع واجهات المحرر. هذا الفحص لا يضمن عمل كل الميزات.'
+    ),
+    notice && React.createElement('p', { className: 'taskflow-store-notice', role: 'status' }, notice),
+    error && React.createElement('p', { className: 'taskflow-store-warning', role: 'alert' }, error),
+    loading && openVsxExtensions.length === 0
+        ? React.createElement('p', { role: 'status' }, 'جارٍ فحص إضافات Open VSX...')
+        : openVsxExtensions.length
+            ? React.createElement('div', { className: 'taskflow-extension-marketplace-items' },
+                openVsxExtensions.map(item => React.createElement('article', {
+                    className: 'taskflow-store-card',
+                    key: item.id
+                },
+                React.createElement('strong', null, item.name),
+                React.createElement('p', null, item.description || 'إضافة متوافقة حسب بياناتها المنشورة.'),
+                React.createElement('small', { className: 'taskflow-store-author' },
+                    `${item.namespace} · ${item.version} · ${item.downloads.toLocaleString()} تنزيل`
+                ),
+                React.createElement('span', { className: 'taskflow-extension-compatibility-badge' },
+                    item.compatibility.status === 'translation-required'
+                        ? 'توافق عبر محاولة تفعيل بديلة'
+                        : 'اجتازت فحص التوافق'
+                ),
+                React.createElement('a', {
+                    href: item.openVsxUrl,
+                    target: '_blank',
+                    rel: 'noopener noreferrer'
+                }, 'تفاصيل الإضافة في Open VSX'),
+                React.createElement('button', {
+                    type: 'button',
+                    disabled: Boolean(busyId),
+                    onClick: () => void installOpenVsxExtension(item)
+                }, busyId === item.id ? 'جارٍ التثبيت...' : 'تثبيت')
+                ))
+            )
+            : React.createElement('p', { className: 'taskflow-store-empty' },
+                'لا توجد إضافات اجتازت فحص التوافق في هذه الصفحة. قد تتطلب بقية النتائج واجهات غير متاحة.'
+            ),
+    openVsxHasMore && React.createElement('button', {
+        type: 'button',
+        disabled: loading,
+        onClick: () => void searchOpenVsx(query, openVsxOffset + 24, true)
+    }, loading ? 'جارٍ الفحص...' : 'فحص المزيد')
     ),
     source === EXTENSION_SOURCE_TASKFLOW && React.createElement('div', { className: 'taskflow-extension-catalog' },
     React.createElement('label', { className: 'taskflow-extension-search' },
@@ -2087,7 +2330,7 @@ function TaskflowExtensionMarketplace({ pluginServer, commandRegistry, onSourceC
         })
     ),
     React.createElement('p', { className: 'taskflow-appearance-description' },
-        'راجع تفاصيل الحزمة قبل تثبيتها؛ فالإضافات تعمل داخل المحرر.'
+        'تظهر هنا الإضافات التي يرفق ناشرها بيانات manifest قابلة للفحص. لا تظهر الحزم التي لم تُتحقق بيانات توافقها.'
     ),
     notice && React.createElement('p', { className: 'taskflow-store-notice', role: 'status' }, notice),
     error && React.createElement('p', { className: 'taskflow-store-warning', role: 'status' }, error),
@@ -2139,7 +2382,9 @@ function TaskflowExtensionMarketplace({ pluginServer, commandRegistry, onSourceC
                     })
                 )
                 : React.createElement('p', { className: 'taskflow-store-empty' },
-                    query.trim() ? 'لا توجد إضافات تطابق البحث.' : 'لا توجد إضافات منشورة في هذه المكتبة بعد.'
+                    query.trim()
+                        ? 'لا توجد إضافات مطابقة اجتازت فحص التوافق.'
+                        : 'لا تعرض المكتبة إضافات موثقة التوافق حاليًا؛ يلزم أن ينشر المستودع ملف manifest لكل حزمة.'
                 )
     ));
 }
@@ -2161,6 +2406,7 @@ let TaskflowExtensionMarketplaceWidget = class TaskflowExtensionMarketplaceWidge
     render() {
         return React.createElement(TaskflowExtensionMarketplace, {
             pluginServer: this.pluginServer,
+            hostedPluginSupport: this.hostedPluginSupport,
             commandRegistry: this.commandRegistry,
             onSourceChange: source => this.onSourceChange?.(source),
             initialSource: this.source ?? activeExtensionSource
@@ -2172,6 +2418,7 @@ TaskflowExtensionMarketplaceWidget.ID = 'taskflow-extension-marketplace-widget';
 injectable()(TaskflowExtensionMarketplaceWidget);
 postConstruct()(TaskflowExtensionMarketplaceWidget.prototype, 'init', null);
 inject(PluginServer)(TaskflowExtensionMarketplaceWidget.prototype, 'pluginServer');
+inject(HostedPluginSupport)(TaskflowExtensionMarketplaceWidget.prototype, 'hostedPluginSupport');
 inject(CommandRegistry)(TaskflowExtensionMarketplaceWidget.prototype, 'commandRegistry');
 
 let TaskflowExtensionMarketplaceContribution = class TaskflowExtensionMarketplaceContribution {
@@ -2183,22 +2430,12 @@ let TaskflowExtensionMarketplaceContribution = class TaskflowExtensionMarketplac
             throw new Error('The native extensions view container is not available.');
         }
         const marketplaceWidget = await this.widgetManager.getOrCreateWidget(TaskflowExtensionMarketplaceWidget.ID);
-        const baseShouldShowWidget = extensionsView.shouldShowWidget.bind(extensionsView);
         extensionsView.shouldShowWidget = part => {
-            if (part.wrapped === marketplaceWidget) {
-                return true;
-            }
-            return activeExtensionSource === EXTENSION_SOURCE_TASKFLOW
-                ? false
-                : baseShouldShowWidget(part);
+            return part.wrapped === marketplaceWidget;
         };
         const updateSource = source => {
             activeExtensionSource = source;
-            if (source === EXTENSION_SOURCE_TASKFLOW) {
-                extensionsView.addClass('taskflow-ai-extension-source');
-            } else {
-                extensionsView.removeClass('taskflow-ai-extension-source');
-            }
+            extensionsView.addClass('taskflow-ai-extension-source');
             for (const part of extensionsView.getParts()) {
                 if (extensionsView.shouldShowWidget(part)) {
                     part.show();
