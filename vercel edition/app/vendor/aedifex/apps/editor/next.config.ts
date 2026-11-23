@@ -8,6 +8,10 @@ const hostedBasePath = process.env.AEDIFEX_BASE_PATH === '/engine/3d' || process
 
 const nextConfig: NextConfig = {
   ...(hostedBasePath ? { basePath: hostedBasePath, assetPrefix: hostedBasePath } : {}),
+  env: {
+    AEDIFEX_AUTH: 'proxy',
+    AEDIFEX_DATA_DIR: '/tmp/aedifex',
+  },
   ...(portableBuild
     ? { output: 'standalone' as const, outputFileTracingRoot: path.join(appDirectory, '../..') }
     : {}),

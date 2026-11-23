@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Building2, Eye, ImageUp, LoaderCircle, Rotate3D, Sparkles, WandSparkles } from "lucide-react";
 import { buildCirculationDoors, deriveWallsFromRooms, placeOpeningsOnWalls, roomLayoutIssues, tileRoomsIntoFootprint } from "../vendor/opencalque/apps/web/src/architectural-plan-geometry";
-import { API_BASE, deviceApiFetch as apiFetch, deliverArtifactToTelegram, sanitizeArtifactFilename, serviceUrl } from "./api";
+import { API_BASE, IS_HOSTED_DEPLOYMENT, deviceApiFetch as apiFetch, deliverArtifactToTelegram, sanitizeArtifactFilename, serviceUrl } from "./api";
 import { analyzeImageWithFlorence, imageCapability } from "./localVision";
 import "./ArchitecturalPlanStudio.css";
 import { useLanguage, translate } from "./localization";
@@ -184,7 +184,7 @@ export default function ArchitecturalPlanStudio({
   useEffect(() => { latestPlan.current = plan; }, [plan]);
 
   useEffect(() => {
-    const editorOrigin = serviceUrl(5174);
+    const editorOrigin = IS_HOSTED_DEPLOYMENT ? window.location.origin : serviceUrl(5174);
     const handleEditorMessage = (event: MessageEvent<unknown>) => {
       const fromEmbeddedFrame = event.source === editorRef.current?.contentWindow;
       const fromExternalEditor = event.source === externalEditorRef.current || isRecord(event.data) && event.data.type === "ready";
@@ -224,7 +224,7 @@ export default function ArchitecturalPlanStudio({
     const message = {
       channel: "ai-taskflow:opencalque", type: "load-plan", payload: editorSyncPlan,
     };
-    const editorOrigin = serviceUrl(5174);
+    const editorOrigin = IS_HOSTED_DEPLOYMENT ? window.location.origin : serviceUrl(5174);
     editorRef.current?.contentWindow?.postMessage(message, editorOrigin);
     externalEditorRef.current?.postMessage(message, editorOrigin);
     setEditorSyncPlan(null);
@@ -583,11 +583,11 @@ Write one record per line, numeric values only, no commas or units suffixes. Ana
         title="OpenCalque 2D architectural editor"
         onLoad={(event) => event.currentTarget.contentWindow?.postMessage({
           channel: "ai-taskflow:opencalque", type: "hello",
-        }, serviceUrl(5174))}
-        onError={() => setError("تعذر تحميل OpenCalque. تأكد من تشغيل خدمة المحرر على المنفذ 5174.")}
+        }, IS_HOSTED_DEPLOYMENT ? window.location.origin : serviceUrl(5174))}
+        onError={() => setError(IS_HOSTED_DEPLOYMENT ? "تعذر تحميل محرر OpenCalque المستضاف." : "تعذر تحميل OpenCalque. تأكد من تشغيل خدمة المحرر على المنفذ 5174.")}
         style={{ display: view === "plan" ? "block" : "none" }}
       />}
-      {engine2dEnabled && view === "plan" && !editorConnected && <div className="architectural-model-status" role="status"><LoaderCircle className="architectural-spin"/> {translate("جارٍ الاتصال بمحرر OpenCalque المحلي...", language)}</div>}
+      {engine2dEnabled && view === "plan" && !editorConnected && <div className="architectural-model-status" role="status"><LoaderCircle className="architectural-spin"/> {IS_HOSTED_DEPLOYMENT ? "جارٍ الاتصال بمحرر OpenCalque المستضاف..." : translate("جارٍ الاتصال بمحرر OpenCalque المحلي...", language)}</div>}
       {aedifexProject && <iframe
         className="architectural-model architectural-model-frame"
         src={aedifexProject}
