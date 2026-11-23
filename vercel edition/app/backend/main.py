@@ -768,6 +768,9 @@ def get_provider_row(provider_id: str, user: dict[str, Any] | None = None):
     return row
 
 def public_provider(row: Any) -> ProviderPublic:
+    created_at = row["created_at"]
+    if isinstance(created_at, datetime):
+        created_at = created_at.isoformat()
     return ProviderPublic(
         id=row["id"],
         name=row["name"],
@@ -776,7 +779,7 @@ def public_provider(row: Any) -> ProviderPublic:
         model=row["model"],
         has_api_key=bool(row["encrypted_api_key"]),
         is_default=bool(row["is_default"]),
-        created_at=row["created_at"],
+        created_at=created_at,
     )
 
 def normalized_base_url(value: str) -> str:
