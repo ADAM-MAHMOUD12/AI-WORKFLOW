@@ -14,20 +14,32 @@
     "engine2d": {
       "root": "app/vendor/opencalque",
       "framework": "vite",
-      "buildCommand": "corepack enable && pnpm install --frozen-lockfile && pnpm build:web",
+      "buildCommand": "corepack enable && corepack pnpm install --frozen-lockfile && corepack pnpm --filter @opencalque/web build",
       "outputDirectory": "apps/web/dist"
     },
     "engine3d": {
       "root": "app/vendor/aedifex",
       "framework": "nextjs",
-      "buildCommand": "bun install --frozen-lockfile && bun run turbo run build --filter=./apps/editor... --concurrency=1"
+      "buildCommand": "npx --yes bun@1.4.4 install --frozen-lockfile && npx --yes bun@1.4.4 run turbo run build --filter=./apps/editor... --concurrency=1"
     }
   },
   "rewrites": [
     {
+      "source": "/engine/2d",
+      "destination": {
+        "service": "engine2d"
+      }
+    },
+    {
       "source": "/engine/2d/(.*)",
       "destination": {
         "service": "engine2d"
+      }
+    },
+    {
+      "source": "/engine/3d",
+      "destination": {
+        "service": "engine3d"
       }
     },
     {
