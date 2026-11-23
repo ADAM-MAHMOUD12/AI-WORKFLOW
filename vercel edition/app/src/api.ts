@@ -25,7 +25,7 @@ export function serviceUrl(port: number, path = "") {
     return `${window.location.origin}/engine/3d${path}`;
   }
   if (IS_HOSTED_DEPLOYMENT && port === 5174) {
-    return `${window.location.origin}/engine/2d${path}`;
+    return `${window.location.origin}/engine/2d/${path.replace(/^\//, "")}`;
   }
   const resolvedPort = servicePorts[port] ?? port;
   return `${window.location.protocol}//${window.location.hostname}:${resolvedPort}${path}`;

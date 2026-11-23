@@ -11,12 +11,6 @@
       "entrypoint": "main:app",
       "installCommand": "pip install -r requirements-vercel.txt"
     },
-    "engine2d": {
-      "root": "app/vendor/opencalque",
-      "framework": "vite",
-      "buildCommand": "corepack enable && corepack pnpm install --frozen-lockfile && corepack pnpm --filter @opencalque/web build",
-      "outputDirectory": "apps/web/dist"
-    },
     "engine3d": {
       "root": "app/vendor/aedifex",
       "framework": "nextjs",
@@ -24,18 +18,6 @@
     }
   },
   "rewrites": [
-    {
-      "source": "/engine/2d",
-      "destination": {
-        "service": "engine2d"
-      }
-    },
-    {
-      "source": "/engine/2d/(.*)",
-      "destination": {
-        "service": "engine2d"
-      }
-    },
     {
       "source": "/engine/3d",
       "destination": {
