@@ -10,9 +10,28 @@
       "framework": "fastapi",
       "entrypoint": "main:app",
       "installCommand": "pip install -r requirements-vercel.txt"
+    },
+    "engine3d": {
+      "root": "app/vendor/aedifex",
+      "framework": "nextjs",
+      "installCommand": "npm install --global bun@1.4.4 && bun install --frozen-lockfile",
+      "buildCommand": "bun run turbo run build --filter=./apps/editor... --concurrency=1",
+      "outputDirectory": "apps/editor/.next"
     }
   },
   "rewrites": [
+    {
+      "source": "/engine/3d",
+      "destination": {
+        "service": "engine3d"
+      }
+    },
+    {
+      "source": "/engine/3d/(.*)",
+      "destination": {
+        "service": "engine3d"
+      }
+    },
     {
       "source": "/api/(.*)",
       "destination": {
