@@ -564,7 +564,17 @@ Write one record per line, numeric values only, no commas or units suffixes. Ana
     {(generating || progress) && <div className="architectural-progress"><Sparkles size={15}/>{translate(progress, language)}</div>}
     {error && <div className="architectural-error">{translate(error, language)}</div>}
     <div className="architectural-viewbar"><div>{engine2dEnabled && <><button type="button" className={view === "plan" ? "active" : ""} onClick={() => setView("plan")}>{translate("المخطط 2D · OpenCalque", language)}</button><a href={`${serviceUrl(5174)}/?external=1&parentOrigin=${encodeURIComponent(window.location.origin)}`} target="_blank" rel="opener"><Eye/>{translate("فتح 2D في صفحة جديدة", language)}</a></>}{engine3dEnabled && <button type="button" className={view === "model" ? "active" : ""} onClick={() => void openInAedifex()} disabled={opening3d}><Eye/>{translate("عرض AI TaskFlow 3D", language)}</button>}</div>{engine3dEnabled && <div><button type="button" onClick={() => void openInAedifex()} disabled={opening3d}>{opening3d ? <LoaderCircle className="architectural-spin"/> : <Rotate3D/>}{opening3d ? translate("يجهز المشروع", language) : translate("تحويل وتعديل بـ AI TaskFlow 3D", language)}</button></div>}</div>
-    <div className="architectural-workspace">
+    <div
+      className="architectural-workspace"
+      onMouseEnter={() => {
+        document.documentElement.style.overscrollBehavior = "contain";
+        document.body.style.overscrollBehavior = "contain";
+      }}
+      onMouseLeave={() => {
+        document.documentElement.style.removeProperty("overscrollBehavior");
+        document.body.style.removeProperty("overscrollBehavior");
+      }}
+    >
       {view === "model" && !aedifexProject && <div className="architectural-model architectural-empty"><Building2/><span>{translate("اضغط «تحويل وتعديل بـ AI TaskFlow 3D» لإنشاء النموذج ثلاثي الأبعاد.", language)}</span></div>}
       {engine2dEnabled && <iframe
         ref={editorRef}

@@ -21,8 +21,11 @@ export const API_BASE = isHostedOrigin
   : localApiBase;
 
 export function serviceUrl(port: number, path = "") {
-  if (IS_HOSTED_DEPLOYMENT && (port === 3002 || port === 5174)) {
-    return `http://127.0.0.1:${getLocalDevicePort(port)}${path}`;
+  if (IS_HOSTED_DEPLOYMENT && port === 3002) {
+    return `${window.location.origin}/engine/3d${path}`;
+  }
+  if (IS_HOSTED_DEPLOYMENT && port === 5174) {
+    return `${window.location.origin}/engine/2d${path}`;
   }
   const resolvedPort = servicePorts[port] ?? port;
   return `${window.location.protocol}//${window.location.hostname}:${resolvedPort}${path}`;

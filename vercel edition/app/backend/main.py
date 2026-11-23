@@ -1872,7 +1872,6 @@ async def require_user_session_for_multi_user_api(request: Request, call_next):
                 "/api/speech/",
                 "/api/w2m/vision/",
                 "/api/motion/",
-                "/api/aedifex/scenes",
             ))
             or path in {
                 "/api/programming/run",
@@ -4970,7 +4969,23 @@ async def update_motion_editor_project(
 @app.post("/api/aedifex/scenes", dependencies=[Depends(require_api_token)])
 async def create_aedifex_scene(payload: dict[str, Any]):
     """Create a scene in AI TaskFlow 3D and normalize its graph for the editor API."""
-    aedifex_url = os.getenv("AEDIFEX_URL", "http://127.0.0.1:3002/api/scenes").strip().rstrip("/")
+    aedifex_url = os.getenv("AEDIFEX_URL", "").strip().rstrip("/")
+    if not aedifex_url:
+        if IS_VERCEL:
+            public_origin = os.getenv("TASKFLOW_PUBLIC_URL", "").strip().rstrip("/")
+            if not public_origin:
+                deployment_host = (
+                    os.getenv("VERCEL_PROJECT_PRODUCTION_URL", "").strip()
+                    or os.getenv("VERCEL_URL", "").strip()
+                )
+                if deployment_host:
+                    public_origin = f"https://{deployment_host.removeprefix('https://')}"
+            if public_origin:
+                aedifex_url = f"{public_origin}/engine/3d/api/scenes"
+            else:
+                raise HTTPException(status_code=503, detail="The hosted AI TaskFlow 3D service is not configured.")
+        else:
+            aedifex_url = "http://127.0.0.1:3002/api/scenes"
     graph = payload.get("graph")
     if isinstance(graph, dict) and isinstance(graph.get("nodes"), list):
         graph["nodes"] = {node["id"]: node for node in graph["nodes"] if isinstance(node, dict) and node.get("id")}

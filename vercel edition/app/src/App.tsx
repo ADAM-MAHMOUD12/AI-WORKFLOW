@@ -1087,7 +1087,17 @@ function WorkspaceApp() {
 
     if (page === "AI TaskFlow 3D") {
       return (
-        <section className="taskflow3d-page">
+        <section
+          className="taskflow3d-page"
+          onMouseEnter={() => {
+            document.documentElement.style.overscrollBehavior = "contain";
+            document.body.style.overscrollBehavior = "contain";
+          }}
+          onMouseLeave={() => {
+            document.documentElement.style.removeProperty("overscrollBehavior");
+            document.body.style.removeProperty("overscrollBehavior");
+          }}
+        >
           <iframe
             src={serviceUrl(3002)}
             title="AI TaskFlow 3D"

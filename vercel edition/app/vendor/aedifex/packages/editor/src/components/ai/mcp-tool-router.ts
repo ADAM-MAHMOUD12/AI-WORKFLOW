@@ -18,16 +18,28 @@
 import { validateDesign } from '@aedifex/core/procedural-items'
 import { isAgentRefusal, RETIRED_MCP_TOOLS, retiredToolRefusal } from '@aedifex/core/agent-tools'
 import { placeDesign } from '@aedifex/mcp/operations'
-import { placeDesignInput } from '@aedifex/mcp/tools/place-design'
-import { validateDesignInput } from '@aedifex/mcp/tools/validate-design'
 import { z } from 'zod'
 import type { AnyNode, AnyNodeId } from '@aedifex/core/schema'
 import { getSceneOperations } from './scene-operations-adapter'
 import { isSharedAgentToolName } from './contracts/shared-agent-tools'
 import { runSharedAgentTool } from './ai-shared-agent-executor'
 
-const validateDesignArgs = z.object(validateDesignInput)
-const placeDesignArgs = z.object(placeDesignInput)
+const validateDesignArgs = z.object({
+  design: z.union([z.string(), z.record(z.string(), z.unknown())]),
+  parameters: z.record(z.string(), z.number()).optional(),
+})
+const placeDesignArgs = z.object({
+  design: z.union([z.string(), z.record(z.string(), z.unknown())]),
+  hostId: z.string(),
+  position: z.tuple([z.number(), z.number(), z.number()]),
+  rotation: z.number().optional(),
+  side: z.enum(['front', 'back']).optional(),
+  surfaceId: z.string().optional(),
+  parameters: z.record(z.string(), z.number()).optional(),
+  slots: z.record(z.string(), z.string()).optional(),
+  name: z.string().optional(),
+  id: z.string().optional(),
+})
 
 export { SUPPORTED_REMOTE_MCP_TOOL_NAMES } from './contracts/remote-tools'
 
