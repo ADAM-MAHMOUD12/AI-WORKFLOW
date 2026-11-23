@@ -22,7 +22,7 @@ export const API_BASE = isHostedOrigin
 
 export function serviceUrl(port: number, path = "") {
   if (IS_HOSTED_DEPLOYMENT && port === 3002) {
-    return `${window.location.origin}/engine/3d${path}`;
+    return `${window.location.origin}/engine/3d/${path.replace(/^\//, "")}`;
   }
   if (IS_HOSTED_DEPLOYMENT && port === 5174) {
     return `${window.location.origin}/engine/2d/${path.replace(/^\//, "")}`;
