@@ -1,0 +1,378 @@
+/* ==========================================================================
+   AI Planner — Modern Spreadsheet & Workspace
+   ========================================================================== */
+
+.planner-page {
+  display: grid;
+  gap: 22px;
+  min-width: 0;
+}
+
+.planner-heading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.planner-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(6, 182, 212, 0.12));
+  color: #c4b5fd;
+  box-shadow: 0 0 15px rgba(139, 92, 246, 0.2);
+}
+
+.planner-heading h2 {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.planner-heading p,
+.planner-footnote {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.8;
+}
+
+.planner-new-workbook {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  margin-inline-start: auto;
+  padding: 8px 16px;
+  border: 1px solid rgba(139, 92, 246, 0.45);
+  border-radius: 10px;
+  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.35);
+  transition: all 0.2s var(--ease-smooth);
+}
+
+.planner-new-workbook:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.12);
+  box-shadow: 0 6px 20px rgba(139, 92, 246, 0.5);
+}
+
+.planner-workbooks {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+  backdrop-filter: blur(16px);
+}
+
+.planner-workbooks-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.planner-workbooks-heading > div {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.planner-workbooks-heading h3 {
+  margin: 0;
+  color: #ffffff;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.planner-workbooks-heading span {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.planner-workbook-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px;
+}
+
+.planner-workbook-card {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 58px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.025);
+  color: #dfdceb;
+  text-align: right;
+  transition: all 0.2s ease;
+}
+
+.planner-workbook-card:hover {
+  border-color: rgba(139, 92, 246, 0.35);
+  background: rgba(139, 92, 246, 0.08);
+  transform: translateY(-1px);
+}
+
+.planner-workbook-card.active {
+  border-color: rgba(139, 92, 246, 0.6);
+  background: rgba(139, 92, 246, 0.16);
+  box-shadow: 0 0 15px rgba(139, 92, 246, 0.2);
+}
+
+.planner-workbook-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  border-radius: 8px;
+  background: rgba(139, 92, 246, 0.14);
+  color: #c4b5fd;
+}
+
+.planner-workbook-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.planner-workbook-copy strong {
+  overflow: hidden;
+  color: #f1f0f8;
+  font-size: 11px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planner-workbook-copy small,
+.planner-workbook-date {
+  color: var(--muted);
+  font-size: 9.5px;
+  white-space: nowrap;
+}
+
+.planner-mode {
+  display: inline-flex;
+  align-self: start;
+  width: fit-content;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: rgba(16, 18, 28, 0.8);
+}
+
+.planner-mode button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 7px 14px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  transition: all 0.18s ease;
+}
+
+.planner-mode button.active {
+  border-color: rgba(139, 92, 246, 0.4);
+  background: rgba(139, 92, 246, 0.2);
+  color: #ffffff;
+  box-shadow: 0 2px 10px rgba(139, 92, 246, 0.2);
+}
+
+.planner-prompt {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--panel);
+  backdrop-filter: blur(16px);
+}
+
+.planner-prompt > label {
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.planner-prompt textarea {
+  width: 100%;
+  min-height: 80px;
+  resize: vertical;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 11px;
+  background: rgba(10, 12, 18, 0.85);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.8;
+  transition: border-color 0.2s ease;
+}
+
+.planner-prompt textarea:focus {
+  border-color: var(--border-focus);
+}
+
+.planner-prompt-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.planner-provider {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.planner-provider select {
+  min-width: 220px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: rgba(18, 20, 32, 0.9);
+  color: #ffffff;
+  font-size: 11px;
+}
+
+.planner-ai-reply { min-width: 0; overflow: hidden; border: 1px solid rgba(117, 204, 176, .24); border-radius: 12px; background: rgba(11, 20, 19, .9); }
+.planner-ai-reply > div { display: flex; gap: 5px; padding: 6px; border-bottom: 1px solid rgba(117, 204, 176, .18); background: rgba(22, 38, 34, .8); }
+.planner-ai-reply button { min-height: 30px; padding: 4px 11px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: #9eaaa5; font: inherit; font-size: 10px; cursor: pointer; }
+.planner-ai-reply button[aria-selected="true"] { border-color: #347461; background: #19372f; color: #baf2dd; }
+.planner-ai-reply pre { max-height: 280px; overflow: auto; margin: 0; padding: 12px; color: #cce5d8; direction: ltr; text-align: left; white-space: pre-wrap; overflow-wrap: anywhere; font: 10px/1.65 'Cascadia Code',Consolas,monospace; }
+.planner-ai-reply p { margin: 0; padding: 12px; color: #cce5d8; font-size: 11px; }
+
+.planner-primary,
+.planner-actions button,
+.planner-export {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 8px 15px;
+  border: 1px solid rgba(139, 92, 246, 0.45);
+  border-radius: 10px;
+  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
+  transition: all 0.2s ease;
+}
+
+.planner-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.12);
+}
+
+.planner-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.planner-actions button,
+.planner-export {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--border);
+  color: #d8d6e8;
+  box-shadow: none;
+}
+
+.planner-actions button:hover,
+.planner-export:hover {
+  border-color: rgba(139, 92, 246, 0.4);
+  background: rgba(139, 92, 246, 0.12);
+  color: #ffffff;
+}
+
+.planner-table-scroll {
+  width: 100%;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: var(--shadow-md);
+}
+
+.planner-table {
+  width: 100%;
+  min-width: 700px;
+  border-collapse: collapse;
+}
+
+.planner-table th,
+.planner-table td {
+  min-width: 130px;
+  max-width: 380px;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  text-align: right;
+  vertical-align: top;
+}
+
+.planner-table th {
+  background: rgba(20, 23, 36, 0.95);
+}
+
+.planner-table th input,
+.planner-table td textarea {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #f1f0f8;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.planner-table th input {
+  color: #c4b5fd;
+  font-weight: 700;
+}
+
+.planner-table th input:focus,
+.planner-table td textarea:focus {
+  border-color: var(--border-focus);
+  background: rgba(10, 12, 18, 0.8);
+  outline: none;
+}
+
+.planner-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.025);
+}

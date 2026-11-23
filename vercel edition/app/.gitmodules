@@ -1,0 +1,3 @@
+[submodule "vendor/aedifex"]
+	path = vendor/aedifex
+	url = https://github.com/TangSY/aedifex.git

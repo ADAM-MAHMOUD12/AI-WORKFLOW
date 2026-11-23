@@ -1,0 +1,10 @@
+.document-attachments { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.document-attachments-input { display: none; }
+.document-attachments-add,.document-attachment { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 29px; padding: 5px 8px; border: 1px solid #354c45; border-radius: 5px; background: #14201b; color: #bad8ca; font-size: 9px; }
+.document-attachments-add:hover:not(:disabled) { border-color: #5b9b7c; background: #1b3025; }
+.document-attachments-add:disabled { opacity: .5; cursor: not-allowed; }
+.document-attachment { min-width: 0; max-width: min(260px,100%); background: #151a19; color: #cbd6d1; }
+.document-attachment > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.document-attachment button { display: grid; place-items: center; width: 18px; height: 18px; flex: 0 0 18px; padding: 0; border: 0; border-radius: 3px; background: transparent; color: #94a49d; }
+.document-attachment button:hover { background: #3a2528; color: #ffc5c5; }
+.document-attachments-error { flex-basis: 100%; color: #f0aaaa; font-size: 9px; }

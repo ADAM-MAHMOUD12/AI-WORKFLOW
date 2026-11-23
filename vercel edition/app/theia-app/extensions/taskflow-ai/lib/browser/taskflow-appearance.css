@@ -1,0 +1,721 @@
+.taskflow-appearance-panel {
+  box-sizing: border-box;
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  height: 100%;
+  width: 100%;
+  min-width: 0;
+  max-width: 1100px;
+  margin-inline: auto;
+  padding: 24px;
+  overflow: auto;
+  color: var(--theia-ui-foreground);
+  font: var(--theia-ui-font-size) var(--theia-ui-font-family);
+}
+
+.taskflow-appearance-panel h2 {
+  margin: 4px 0 0;
+  font-size: 18px;
+}
+
+.taskflow-store-section h3 {
+  margin: 4px 0 0;
+  font-size: 15px;
+}
+
+.taskflow-appearance-description,
+.taskflow-store-empty,
+.taskflow-store-card p {
+  margin: 0;
+  color: var(--theia-descriptionForeground);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.taskflow-about-author {
+  margin: 10px 0 0;
+  color: var(--theia-descriptionForeground);
+  font-weight: 600;
+}
+
+.taskflow-appearance-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 190px));
+  gap: 8px;
+}
+
+.taskflow-appearance-panel button {
+  min-height: var(--taskflow-theme-button-height, 38px);
+  padding: 6px 10px;
+  color: var(--theia-button-foreground);
+  background: var(--theia-button-background);
+  border: 1px solid var(--theia-contrastBorder, transparent);
+  border-radius: var(--taskflow-theme-button-radius, 4px);
+  font: inherit;
+  cursor: pointer;
+}
+
+.taskflow-local-imports button {
+  min-height: 44px;
+}
+
+.taskflow-appearance-panel button:hover:not(:disabled) {
+  background: var(--theia-button-hoverBackground);
+}
+
+.taskflow-appearance-panel button:focus-visible {
+  outline: 2px solid var(--theia-focusBorder);
+  outline-offset: 2px;
+}
+
+.taskflow-appearance-panel button:disabled {
+  opacity: 0.65;
+  cursor: progress;
+}
+
+.taskflow-store-active,
+.taskflow-store-notice,
+.taskflow-store-warning {
+  margin: 0;
+  padding: 9px;
+  border: 1px solid var(--theia-panel-border);
+  border-radius: 4px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.taskflow-store-warning {
+  color: var(--theia-editorWarning-foreground, var(--theia-ui-foreground));
+}
+
+.taskflow-store-section {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--theia-panel-border);
+  border-radius: var(--taskflow-theme-corner-radius, 8px);
+  background: color-mix(in srgb, var(--theia-sideBar-background) 55%, transparent);
+}
+
+.taskflow-store-sections {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  align-items: start;
+  gap: 14px;
+}
+
+.taskflow-open-vsx-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.taskflow-open-vsx-search input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 6px 10px;
+  color: var(--theia-input-foreground, var(--theia-ui-foreground));
+  background: var(--theia-input-background, var(--theia-sideBar-background));
+  border: 1px solid var(--theia-panel-border);
+  border-radius: var(--taskflow-theme-button-radius, 6px);
+  font: inherit;
+}
+
+.taskflow-open-vsx-search input:focus-visible,
+.taskflow-open-vsx-search button:focus-visible,
+.taskflow-open-vsx-theme-list a:focus-visible {
+  outline: 2px solid var(--theia-focusBorder);
+  outline-offset: 2px;
+}
+
+.taskflow-open-vsx-theme-list {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  max-height: min(60vh, 640px);
+  overflow: auto;
+}
+
+.taskflow-open-vsx-link {
+  color: var(--theia-textLink-foreground);
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+}
+
+.taskflow-shared-skill-library {
+  margin-top: 14px;
+}
+
+.taskflow-shared-skill-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+  align-items: start;
+  gap: 12px;
+}
+
+.taskflow-shared-skill-source {
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--theia-panel-border);
+  border-radius: var(--taskflow-theme-corner-radius, 7px);
+  background: color-mix(in srgb, var(--theia-sideBar-background) 72%, transparent);
+}
+
+.taskflow-shared-skill-source > a {
+  width: fit-content;
+  color: var(--theia-textLink-foreground);
+  text-underline-offset: 2px;
+}
+
+.taskflow-shared-skill-list {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  max-height: min(58vh, 620px);
+  overflow: auto;
+}
+
+.taskflow-shared-skill-list .taskflow-store-card button,
+.taskflow-open-vsx-search button {
+  min-height: 44px;
+}
+
+.taskflow-store-card {
+  display: grid;
+  gap: 7px;
+  padding: 10px;
+  border: 1px solid var(--theia-panel-border);
+  border-radius: var(--taskflow-theme-corner-radius, 5px);
+  background: var(--theia-sideBar-background);
+}
+
+.taskflow-store-card p {
+  overflow-wrap: anywhere;
+}
+
+.taskflow-store-preview {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border: 1px solid var(--theia-panel-border);
+  border-radius: 4px;
+}
+
+.taskflow-store-readme-preview {
+  min-width: 0;
+  color: var(--theia-textLink-foreground);
+}
+
+.taskflow-store-readme-preview summary {
+  min-height: 36px;
+  align-content: center;
+  cursor: pointer;
+  text-underline-offset: 2px;
+}
+
+.taskflow-store-readme-preview summary:focus-visible {
+  outline: 2px solid var(--theia-focusBorder);
+  outline-offset: 3px;
+}
+
+.taskflow-store-readme-preview .taskflow-readme-rendered {
+  max-height: 240px;
+  margin: 8px 0 0;
+  padding: 10px;
+  overflow: auto;
+  color: var(--theia-ui-foreground);
+  background: color-mix(in srgb, var(--theia-editor-background) 85%, transparent);
+  border: 1px solid var(--theia-panel-border);
+  border-radius: var(--taskflow-theme-corner-radius, 5px);
+  font: inherit;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.taskflow-readme-rendered > :first-child {
+  margin-top: 0;
+}
+
+.taskflow-readme-rendered > :last-child {
+  margin-bottom: 0;
+}
+
+.taskflow-readme-rendered h1,
+.taskflow-readme-rendered h2,
+.taskflow-readme-rendered h3,
+.taskflow-readme-rendered h4,
+.taskflow-readme-rendered h5,
+.taskflow-readme-rendered h6 {
+  margin: 14px 0 6px;
+  color: var(--theia-ui-foreground);
+  line-height: 1.3;
+}
+
+.taskflow-readme-rendered h1 { font-size: 1.45em; }
+.taskflow-readme-rendered h2 { font-size: 1.3em; }
+.taskflow-readme-rendered h3 { font-size: 1.15em; }
+.taskflow-readme-rendered h4,
+.taskflow-readme-rendered h5,
+.taskflow-readme-rendered h6 { font-size: 1em; }
+
+.taskflow-readme-rendered p,
+.taskflow-readme-rendered ul,
+.taskflow-readme-rendered ol,
+.taskflow-readme-rendered blockquote,
+.taskflow-readme-rendered pre {
+  margin: 8px 0;
+}
+
+.taskflow-readme-rendered ul,
+.taskflow-readme-rendered ol {
+  padding-inline-start: 22px;
+}
+
+.taskflow-readme-rendered blockquote {
+  padding-inline-start: 10px;
+  color: var(--theia-descriptionForeground);
+  border-inline-start: 3px solid var(--theia-panel-border);
+}
+
+.taskflow-readme-rendered a {
+  color: var(--theia-textLink-foreground);
+  text-underline-offset: 2px;
+}
+
+.taskflow-readme-rendered code,
+.taskflow-readme-rendered pre {
+  font-family: var(--theia-editor-font-family, monospace);
+}
+
+.taskflow-readme-rendered p > code,
+.taskflow-readme-rendered li code {
+  padding: 1px 4px;
+  background: color-mix(in srgb, var(--theia-editor-background) 85%, transparent);
+  border-radius: 3px;
+}
+
+.taskflow-readme-rendered pre {
+  padding: 8px;
+  overflow: auto;
+  background: color-mix(in srgb, var(--theia-editor-background) 85%, transparent);
+  border: 1px solid var(--theia-panel-border);
+  border-radius: var(--taskflow-theme-corner-radius, 5px);
+}
+
+.taskflow-readme-image {
+  display: block;
+  max-width: 100%;
+  max-height: 180px;
+  margin-block: 8px;
+  object-fit: contain;
+}
+
+.taskflow-store-author {
+  color: var(--theia-descriptionForeground);
+}
+
+.taskflow-extension-actions {
+  display: grid;
+  gap: 7px;
+}
+
+.taskflow-extension-marketplace-widget {
+  min-width: 0;
+}
+
+.taskflow-extension-marketplace {
+  box-sizing: border-box;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  height: 100%;
+  min-width: 0;
+  padding: 10px;
+  overflow: auto;
+  color: var(--theia-ui-foreground);
+  font: var(--theia-ui-font-size) var(--theia-ui-font-family);
+}
+
+.taskflow-extension-source-select {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  color: var(--theia-ui-foreground);
+  font-size: 12px;
+}
+
+.taskflow-extension-source-select select,
+.taskflow-extension-search input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 10px;
+  color: var(--theia-input-foreground, var(--theia-ui-foreground));
+  background: var(--theia-input-background, var(--theia-sideBar-background));
+  border: 1px solid var(--theia-panel-border);
+  border-radius: var(--taskflow-theme-button-radius, 6px);
+  font: inherit;
+}
+
+.taskflow-extension-source-select select:focus-visible,
+.taskflow-extension-search input:focus-visible {
+  outline: 2px solid var(--theia-focusBorder);
+  outline-offset: 2px;
+}
+
+.taskflow-extension-search {
+  display: grid;
+  gap: 6px;
+  color: var(--theia-ui-foreground);
+  font-size: 12px;
+}
+
+.taskflow-ai-extension-source .theia-vsx-extensions-search-bar {
+  display: none;
+}
+
+.taskflow-extension-catalog {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
+}
+
+.taskflow-extension-marketplace-items {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.taskflow-extension-marketplace .taskflow-store-card button {
+  min-height: 44px;
+}
+
+.taskflow-extension-marketplace .taskflow-store-card a:focus-visible,
+.taskflow-extension-search button:focus-visible,
+.taskflow-extension-marketplace > button:focus-visible {
+  outline: 2px solid var(--theia-focusBorder);
+  outline-offset: 2px;
+}
+
+.taskflow-extension-compatibility-badge {
+  width: fit-content;
+  padding: 3px 8px;
+  color: var(--theia-button-foreground, var(--theia-ui-foreground));
+  border: 1px solid var(--theia-focusBorder);
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.taskflow-theme-settings-page {
+  max-width: 860px;
+}
+
+.taskflow-theme-settings-page h1 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.taskflow-theme-live-preview {
+  margin: 0;
+  padding: 10px 12px;
+  color: var(--theia-ui-foreground);
+  border: 1px solid color-mix(in srgb, var(--taskflow-theme-glass-tint, #9b87ef) 45%, var(--theia-panel-border));
+  border-radius: var(--taskflow-theme-corner-radius, 8px);
+  background: color-mix(in srgb, var(--taskflow-theme-glass-tint, #9b87ef) 14%, var(--theia-sideBar-background));
+}
+
+.taskflow-theme-settings-back {
+  width: fit-content;
+  min-height: 44px !important;
+}
+
+.taskflow-theme-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+  gap: 12px;
+}
+
+.taskflow-theme-settings-grid > label,
+.taskflow-theme-settings-grid > .taskflow-theme-setting-wallpaper {
+  display: grid;
+  align-content: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 82px;
+  padding: 14px;
+  color: var(--theia-ui-foreground);
+  border: 1px solid color-mix(in srgb, var(--taskflow-theme-glass-tint, #9b87ef) 24%, var(--theia-panel-border));
+  border-radius: var(--taskflow-theme-corner-radius, 12px);
+  background:
+    linear-gradient(145deg,
+      color-mix(in srgb, var(--theia-sideBar-background) var(--taskflow-theme-glass-opacity, 68%), transparent),
+      color-mix(in srgb, var(--theia-panel-background) var(--taskflow-theme-glass-opacity, 68%), transparent)),
+    color-mix(in srgb, var(--taskflow-theme-glass-tint, #9b87ef) 8%, transparent),
+    var(--taskflow-theme-glass-wallpaper, none);
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 12px 32px color-mix(in srgb, #000 20%, transparent), inset 0 1px rgb(255 255 255 / 8%);
+  backdrop-filter: blur(var(--taskflow-theme-glass-blur, 20px)) saturate(var(--taskflow-theme-glass-saturation, 125%));
+}
+
+.taskflow-theme-setting-range > span,
+.taskflow-theme-setting-color > span,
+.taskflow-theme-setting-select > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.taskflow-theme-setting-range output {
+  color: var(--theia-descriptionForeground);
+  font-variant-numeric: tabular-nums;
+}
+
+.taskflow-theme-setting-range input {
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  accent-color: var(--taskflow-theme-glass-tint, var(--theia-textLink-foreground));
+}
+
+.taskflow-theme-setting-color input {
+  width: 48px;
+  height: 44px;
+  justify-self: end;
+  padding: 3px;
+  border: 1px solid var(--theia-panel-border);
+  border-radius: 8px;
+  background: transparent;
+}
+
+.taskflow-theme-setting-select select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 9px;
+  color: var(--theia-input-foreground, var(--theia-ui-foreground));
+  background: var(--theia-input-background, var(--theia-sideBar-background));
+  border: 1px solid var(--theia-panel-border);
+  border-radius: 6px;
+  font: inherit;
+}
+
+.taskflow-theme-setting-toggle {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+}
+
+.taskflow-theme-setting-toggle input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--taskflow-theme-glass-tint, var(--theia-textLink-foreground));
+}
+
+.taskflow-theme-setting-wallpaper input {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-height: 44px;
+  color: var(--theia-descriptionForeground);
+  font: inherit;
+}
+
+.taskflow-theme-setting-wallpaper button {
+  min-height: 44px;
+}
+
+.taskflow-theme-settings-save,
+.taskflow-theme-settings-cancel {
+  min-height: 46px !important;
+}
+
+.taskflow-installed-theme-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px;
+  border: 1px solid var(--theia-panel-border);
+  border-radius: var(--taskflow-theme-corner-radius, 8px);
+  background: var(--theia-sideBar-background);
+}
+
+.taskflow-installed-theme-card p {
+  margin: 4px 0 0;
+  color: var(--theia-descriptionForeground);
+  line-height: 1.5;
+}
+
+.taskflow-installed-theme-card button {
+  min-height: 44px;
+}
+
+.taskflow-extension-actions small {
+  color: var(--theia-descriptionForeground);
+  line-height: 1.5;
+}
+
+[data-taskflow-glass="true"] .taskflow-store-section,
+[data-taskflow-glass="true"] .taskflow-store-card,
+[data-taskflow-glass="true"] .taskflow-appearance-panel button {
+  border-radius: var(--taskflow-theme-corner-radius, 8px);
+}
+
+[data-taskflow-glass="true"] .taskflow-store-section,
+[data-taskflow-glass="true"] .taskflow-store-card {
+  background-color: color-mix(in srgb, var(--theia-sideBar-background) var(--taskflow-theme-glass-opacity, 68%), transparent);
+  backdrop-filter: blur(var(--taskflow-theme-glass-blur, 20px)) saturate(var(--taskflow-theme-glass-saturation, 125%));
+}
+
+[data-taskflow-glass="true"] .theia-sideBar,
+[data-taskflow-glass="true"] .theia-auxiliary-bar {
+  background-color: var(--theia-sideBar-background);
+  background-color: color-mix(in srgb, var(--theia-sideBar-background) var(--taskflow-theme-glass-opacity, 68%), transparent);
+  backdrop-filter: blur(var(--taskflow-theme-glass-blur, 20px)) saturate(var(--taskflow-theme-glass-saturation, 125%));
+}
+
+[data-taskflow-glass="true"] .theia-app-sidebar-container,
+[data-taskflow-glass="true"] .theia-sidepanel-toolbar,
+[data-taskflow-glass="true"] .theia-side-panel {
+  background-color: var(--theia-sideBar-background);
+  background-color: color-mix(in srgb, var(--theia-sideBar-background) var(--taskflow-theme-glass-opacity, 68%), transparent);
+  backdrop-filter: blur(var(--taskflow-theme-glass-blur, 20px)) saturate(var(--taskflow-theme-glass-saturation, 125%));
+}
+
+[data-taskflow-glass="true"] .theia-app-centers,
+[data-taskflow-glass="true"] .theia-app-bottom {
+  background-color: var(--theia-panel-background);
+  background-color: color-mix(in srgb, var(--theia-panel-background) var(--taskflow-theme-glass-opacity, 68%), transparent);
+  backdrop-filter: blur(var(--taskflow-theme-glass-blur, 20px)) saturate(var(--taskflow-theme-glass-saturation, 125%));
+}
+
+[data-taskflow-glass="true"] .theia-app-left,
+[data-taskflow-glass="true"] .theia-app-right {
+  background-color: var(--theia-tabBar-background, var(--theia-sideBar-background));
+  background-color: color-mix(in srgb, var(--theia-tabBar-background, var(--theia-sideBar-background)) var(--taskflow-theme-glass-opacity, 68%), transparent);
+  backdrop-filter: blur(var(--taskflow-theme-glass-blur, 20px)) saturate(var(--taskflow-theme-glass-saturation, 125%));
+}
+
+html[data-taskflow-button-style="soft"] :is(button, .theia-button) {
+  background: color-mix(in srgb, var(--theia-button-background) 22%, var(--theia-sideBar-background));
+}
+
+html[data-taskflow-button-style="outline"] :is(button, .theia-button) {
+  color: var(--theia-button-background);
+  background: transparent;
+  border-color: var(--theia-button-background);
+}
+
+html[data-taskflow-button-style="glass"] :is(button, .theia-button) {
+  background: color-mix(in srgb, var(--theia-button-background) 28%, transparent);
+  border-color: color-mix(in srgb, var(--theia-button-background) 55%, var(--theia-panel-border));
+  backdrop-filter: blur(var(--taskflow-theme-glass-blur, 20px));
+}
+
+html[data-taskflow-button-style] :is(button, .theia-button, .theia-tab) {
+  min-height: var(--taskflow-theme-button-height, 38px);
+  border-radius: var(--taskflow-theme-button-radius, 4px);
+}
+
+html[data-taskflow-motion="subtle"] :is(button, .theia-button, .theia-tab, .taskflow-store-card) {
+  transition: background-color var(--taskflow-theme-motion-duration, 180ms) ease,
+    color var(--taskflow-theme-motion-duration, 180ms) ease,
+    border-color var(--taskflow-theme-motion-duration, 180ms) ease,
+    transform var(--taskflow-theme-motion-duration, 180ms) ease,
+    box-shadow var(--taskflow-theme-motion-duration, 180ms) ease;
+}
+
+html[data-taskflow-motion="smooth"] :is(button, .theia-button, .theia-tab, .taskflow-store-card) {
+  transition: background-color var(--taskflow-theme-motion-duration, 240ms) cubic-bezier(.2, .75, .25, 1),
+    color var(--taskflow-theme-motion-duration, 240ms) cubic-bezier(.2, .75, .25, 1),
+    border-color var(--taskflow-theme-motion-duration, 240ms) cubic-bezier(.2, .75, .25, 1),
+    transform var(--taskflow-theme-motion-duration, 240ms) cubic-bezier(.2, .75, .25, 1),
+    box-shadow var(--taskflow-theme-motion-duration, 240ms) cubic-bezier(.2, .75, .25, 1);
+}
+
+html[data-taskflow-motion="snappy"] :is(button, .theia-button, .theia-tab, .taskflow-store-card) {
+  transition: background-color var(--taskflow-theme-motion-duration, 120ms) ease-out,
+    color var(--taskflow-theme-motion-duration, 120ms) ease-out,
+    border-color var(--taskflow-theme-motion-duration, 120ms) ease-out,
+    transform var(--taskflow-theme-motion-duration, 120ms) ease-out,
+    box-shadow var(--taskflow-theme-motion-duration, 120ms) ease-out;
+}
+
+html[data-taskflow-motion]:not([data-taskflow-motion="none"])
+  :is(button, .theia-button, .theia-tab):hover:not(:disabled) {
+  transform: translateY(calc(0px - var(--taskflow-theme-hover-lift, 1px)));
+}
+
+html[data-taskflow-motion="none"] :is(button, .theia-button, .theia-tab, .taskflow-store-card) {
+  transition: none;
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-taskflow-motion] :is(button, .theia-button, .theia-tab, .taskflow-store-card) {
+    transition: none;
+    animation: none;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  [data-taskflow-glass="true"] .theia-sideBar,
+  [data-taskflow-glass="true"] .theia-auxiliary-bar,
+  [data-taskflow-glass="true"] .theia-app-sidebar-container,
+  [data-taskflow-glass="true"] .theia-sidepanel-toolbar,
+  [data-taskflow-glass="true"] .theia-side-panel {
+    background-color: var(--theia-sideBar-background);
+    backdrop-filter: none;
+  }
+
+  [data-taskflow-glass="true"] .taskflow-store-section,
+  [data-taskflow-glass="true"] .taskflow-store-card {
+    background-color: var(--theia-sideBar-background);
+    backdrop-filter: none;
+  }
+
+  .taskflow-theme-settings-grid > label,
+  .taskflow-theme-settings-grid > .taskflow-theme-setting-wallpaper {
+    background: var(--theia-sideBar-background);
+    backdrop-filter: none;
+  }
+
+  [data-taskflow-glass="true"] .theia-app-centers,
+  [data-taskflow-glass="true"] .theia-app-bottom {
+    background-color: var(--theia-panel-background);
+    backdrop-filter: none;
+  }
+
+  [data-taskflow-glass="true"] .theia-app-left,
+  [data-taskflow-glass="true"] .theia-app-right {
+    background-color: var(--theia-tabBar-background, var(--theia-sideBar-background));
+    backdrop-filter: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .taskflow-appearance-panel {
+    padding: 16px;
+  }
+
+  .taskflow-installed-theme-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+}

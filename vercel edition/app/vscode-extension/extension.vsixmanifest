@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011">
+  <Metadata>
+    <Identity Language="en-US" Id="taskflow-vscode-bridge" Version="1.4.0" Publisher="taskflow" />
+    <DisplayName>TF CODE Agent Bridge</DisplayName>
+    <Description xml:space="preserve">Connect TaskFlow to VS Code over an outbound HTTPS relay and safely run workspace and Git actions.</Description>
+    <Tags>TaskFlow;AI;Editor</Tags>
+    <Categories>Other</Categories>
+    <Properties />
+  </Metadata>
+  <Installation>
+    <InstallationTarget Id="Microsoft.VisualStudio.Code" />
+  </Installation>
+  <Dependencies />
+  <Assets>
+    <Asset Type="Microsoft.VisualStudio.Code.Manifest" Path="extension/package.json" />
+  </Assets>
+</PackageManifest>

@@ -1,0 +1,23 @@
+{
+  "name": "@taskflow/theia-ai",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "theiaExtensions": [
+    {
+      "frontend": "lib/browser/taskflow-ai-frontend-module"
+    },
+    {
+      "frontend": "lib/browser/taskflow-appearance-frontend-module"
+    }
+  ],
+  "dependencies": {
+    "@theia/ai-core": "1.78.0-next.28",
+    "@theia/core": "1.78.0-next.28",
+    "@theia/filesystem": "1.78.0-next.28",
+    "@theia/monaco-editor-core": "1.108.201",
+    "@theia/plugin-ext": "1.78.0-next.28",
+    "@theia/toolbar": "1.78.0-next.28",
+    "@theia/workspace": "1.78.0-next.28"
+  }
+}

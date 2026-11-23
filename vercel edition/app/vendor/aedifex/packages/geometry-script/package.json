@@ -1,0 +1,74 @@
+{
+  "name": "@aedifex/geometry-script",
+  "version": "1.0.3",
+  "description": "Compiles AI-authored three.js and Blender (bpy) geometry scripts into GLB artifacts with an Aedifex manifest. Runs in a browser worker, Bun or Node — no DOM, no React.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./compile": {
+      "types": "./dist/compile.d.ts",
+      "import": "./dist/compile.js",
+      "default": "./dist/compile.js"
+    },
+    "./sandbox": {
+      "types": "./dist/sandbox.d.ts",
+      "import": "./dist/sandbox.js",
+      "default": "./dist/sandbox.js"
+    },
+    "./blender": {
+      "types": "./dist/blender.d.ts",
+      "import": "./dist/blender.js",
+      "default": "./dist/blender.js"
+    },
+    "./blender-local": {
+      "types": "./dist/blender-local.d.ts",
+      "import": "./dist/blender-local.js",
+      "default": "./dist/blender-local.js"
+    },
+    "./author-scene": {
+      "types": "./dist/author-scene.d.ts",
+      "import": "./dist/author-scene.js",
+      "default": "./dist/author-scene.js"
+    }
+  },
+  "files": [
+    "dist",
+    "bpy",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc --build && bun ../../scripts/fix-node-esm-imports.ts dist && bun scripts/build-sandbox.ts",
+    "dev": "tsgo --build --watch",
+    "check-types": "tsgo --noEmit",
+    "prepublishOnly": "npm run build",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "three-bvh-csg": "^0.0.18"
+  },
+  "peerDependencies": {
+    "three": "^0.186",
+    "@aedifex/core": "^0.10.0"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "*",
+    "@types/bun": "^1.4.4",
+    "@types/three": "^0.186.0",
+    "typescript": "7.0.2",
+    "@aedifex/core": "workspace:*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TangSY/aedifex.git",
+    "directory": "packages/geometry-script"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/TangSY/aedifex/tree/main/packages/geometry-script#readme",
+  "bugs": "https://github.com/TangSY/aedifex/issues"
+}

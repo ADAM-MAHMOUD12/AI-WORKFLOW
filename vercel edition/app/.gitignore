@@ -1,0 +1,47 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+/public/vendor/svgedit/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Python backend
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+data/
+.pytest_cache/
+installer/payload/
+installer/output/
+release/
+!release/
+release/*
+!release/TF-CODE-Agent-Bridge.vsix
+theia-app/lib/
+theia-app/src-gen/
+theia-app/esbuild.mjs
+theia-app/gen-esbuild.*.mjs
+
+# Local checkout used to inspect the live GitHub marketplace
+marketplace-repository/

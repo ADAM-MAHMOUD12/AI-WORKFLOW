@@ -1,0 +1,905 @@
+/* Design tokens are adapted from the Vite template's src/index.css. */
+.taskflow-dashboard {
+  --radius: 0.625rem;
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.696 0.17 162.48);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.696 0.17 162.48);
+
+  --bg: var(--background);
+  --bg-subtle: var(--card);
+  --panel: var(--card);
+  --panel-solid: oklch(0.18 0 0);
+  --panel-hover: var(--accent);
+  --border-subtle: oklch(1 0 0 / 6%);
+  --border-hover: oklch(0.696 0.17 162.48 / 45%);
+  --border-focus: var(--ring);
+  --muted-light: oklch(0.82 0 0);
+  --text: var(--foreground);
+  --text-bright: #fff;
+  --purple: var(--chart-2);
+  --purple-bright: var(--chart-2);
+  --purple-glow: oklch(0.696 0.17 162.48 / 22%);
+  --cyan: var(--chart-2);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 20%);
+  --shadow-md: 0 4px 16px rgb(0 0 0 / 20%);
+  --shadow-lg: 0 12px 30px rgb(0 0 0 / 28%);
+  --shadow-glow: 0 0 24px -8px oklch(0.696 0.17 162.48 / 30%);
+
+  display: flex;
+  min-height: 100vh;
+  color: var(--foreground);
+  background: var(--background);
+  font-family: Inter, Cairo, system-ui, sans-serif;
+}
+
+.taskflow-sidebar {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 20;
+  display: flex;
+  flex: 0 0 272px;
+  flex-direction: column;
+  width: 272px;
+  height: 100vh;
+  min-height: 560px;
+  padding: 18px 14px 12px;
+  overflow: visible;
+  color: var(--sidebar-foreground);
+  background: var(--sidebar);
+  border-inline-end: 1px solid var(--sidebar-border);
+}
+
+.taskflow-sidebar-header {
+  display: grid;
+  gap: 18px;
+  padding: 3px 4px 15px;
+}
+
+.taskflow-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 4px 5px;
+}
+
+.taskflow-brand-mark {
+  display: grid;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  color: var(--primary-foreground);
+  background: var(--primary);
+  border-radius: 10px;
+}
+
+.taskflow-brand-copy,
+.taskflow-workspace-copy,
+.taskflow-profile-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.taskflow-brand-copy strong {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.taskflow-brand-copy small {
+  color: var(--muted-foreground);
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.13em;
+}
+
+.taskflow-workspace-switcher {
+  position: relative;
+  z-index: 25;
+}
+
+.taskflow-workspace-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 54px;
+  padding: 8px 9px;
+  color: var(--foreground);
+  text-align: start;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.taskflow-workspace-picker:hover,
+.taskflow-workspace-picker[aria-expanded="true"] {
+  border-color: var(--border-hover);
+  background: var(--accent);
+}
+
+.taskflow-workspace-avatar,
+.taskflow-profile-avatar,
+.taskflow-top-avatar {
+  display: grid;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--secondary);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
+
+.taskflow-workspace-copy {
+  flex: 1;
+}
+
+.taskflow-workspace-copy strong,
+.taskflow-profile-copy strong {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.taskflow-workspace-copy small,
+.taskflow-profile-copy small {
+  overflow: hidden;
+  color: var(--muted-foreground);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.taskflow-workspace-picker > svg {
+  flex: 0 0 auto;
+  color: var(--muted-foreground);
+  transition: transform 160ms ease;
+}
+
+.taskflow-workspace-picker[aria-expanded="true"] > svg {
+  transform: rotate(180deg);
+}
+
+.taskflow-workspace-menu {
+  position: absolute;
+  inset-block-start: calc(100% + 6px);
+  inset-inline: 0;
+  z-index: 40;
+  display: grid;
+  gap: 4px;
+  max-height: min(390px, calc(100vh - 180px));
+  padding: 7px;
+  overflow: auto;
+  background: var(--popover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+}
+
+.taskflow-menu-heading {
+  padding: 5px 8px 3px;
+  color: var(--muted-foreground);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.taskflow-workspace-option {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px;
+  color: var(--popover-foreground);
+  text-align: start;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+}
+
+.taskflow-workspace-option:hover,
+.taskflow-workspace-option.is-active {
+  background: var(--accent);
+  border-color: var(--border);
+}
+
+.taskflow-workspace-option > svg {
+  flex: 0 0 auto;
+  color: var(--ring);
+}
+
+.taskflow-create-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px 32px;
+  gap: 5px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
+.taskflow-create-workspace input {
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  color: var(--foreground);
+  background: var(--background);
+  border: 1px solid var(--input);
+  border-radius: 7px;
+}
+
+.taskflow-create-workspace button,
+.taskflow-create-workspace-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 32px;
+  min-height: 32px;
+  color: var(--foreground);
+  background: var(--secondary);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+
+.taskflow-create-workspace button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.taskflow-create-workspace-button {
+  justify-content: flex-start;
+  padding: 0 9px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+
+.taskflow-create-workspace button:hover:not(:disabled),
+.taskflow-create-workspace-button:hover {
+  color: var(--foreground);
+  background: var(--accent);
+}
+
+.taskflow-sidebar-content {
+  display: grid;
+  align-content: start;
+  gap: 15px;
+  min-height: 0;
+  padding: 4px 1px;
+  overflow: auto;
+}
+
+.taskflow-nav-group h2 {
+  margin: 0;
+  padding: 0 9px 6px;
+  color: var(--muted-foreground);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.taskflow-nav-group nav {
+  display: grid;
+  gap: 2px;
+}
+
+.taskflow-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 9px;
+  color: #dedde8;
+  text-align: start;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.taskflow-nav-item svg {
+  flex: 0 0 auto;
+  color: currentColor;
+}
+
+.taskflow-nav-item:hover {
+  color: var(--foreground);
+  background: var(--accent);
+}
+
+.taskflow-nav-item.is-active {
+  color: var(--sidebar-accent-foreground);
+  background: var(--sidebar-accent);
+  border-color: var(--sidebar-border);
+  font-weight: 600;
+}
+
+.taskflow-nav-item.is-active svg {
+  color: var(--ring);
+}
+
+.taskflow-sidebar-footer {
+  display: grid;
+  gap: 9px;
+  margin-top: auto;
+  padding-top: 9px;
+}
+
+.taskflow-3d-launcher {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 8px 10px;
+  color: var(--foreground);
+  text-align: start;
+  background: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.taskflow-3d-launcher > svg {
+  flex: 0 0 auto;
+  color: var(--ring);
+}
+
+.taskflow-3d-launcher span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.taskflow-3d-launcher strong {
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.taskflow-3d-launcher small {
+  color: var(--muted-foreground);
+  font-size: 9px;
+}
+
+.taskflow-3d-launcher:hover {
+  border-color: var(--ring);
+  box-shadow: var(--shadow-sm);
+}
+
+.taskflow-sidebar-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px;
+  background: color-mix(in oklch, var(--card), var(--sidebar) 34%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.taskflow-note-icon {
+  display: grid;
+  flex: 0 0 27px;
+  width: 27px;
+  height: 27px;
+  place-items: center;
+  color: var(--ring);
+  background: var(--accent);
+  border-radius: 7px;
+}
+
+.taskflow-sidebar-note > span:last-child {
+  display: grid;
+  gap: 3px;
+}
+
+.taskflow-sidebar-note strong {
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.taskflow-sidebar-note small {
+  color: var(--muted-foreground);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.taskflow-sidebar-note-copy {
+  display: grid;
+  justify-items: start;
+  gap: 3px;
+}
+
+.taskflow-sidebar-note-copy button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 3px;
+  padding: 3px 0;
+  color: var(--ring);
+  font-size: 10px;
+  font-weight: 600;
+  background: transparent;
+  border: 0;
+}
+
+.taskflow-sidebar-note-copy button:hover {
+  color: var(--foreground);
+}
+
+.taskflow-profile {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 9px 4px 1px;
+  color: var(--foreground);
+  text-align: start;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.taskflow-sidebar-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-top: 1px solid var(--border);
+}
+
+.taskflow-sidebar-footer-actions .taskflow-profile {
+  min-width: 0;
+  border-top: 0;
+}
+
+.taskflow-sidebar-footer-toggle {
+  display: grid;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  color: var(--foreground);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.taskflow-sidebar-footer-toggle:hover {
+  background: var(--accent);
+}
+
+.taskflow-sidebar-footer-toggle:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.taskflow-profile:hover {
+  background: var(--accent);
+  border-radius: 7px;
+}
+
+.taskflow-profile-avatar {
+  flex-basis: 32px;
+  width: 32px;
+  height: 32px;
+  font-size: 12px;
+}
+
+.taskflow-profile-copy {
+  flex: 1;
+}
+
+.taskflow-profile > svg {
+  color: #c3c2d0;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.taskflow-main {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 100vh;
+  background: var(--background);
+}
+
+.taskflow-topbar {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 64px;
+  padding: 0 28px;
+  background: color-mix(in oklch, var(--background), transparent 3%);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(14px);
+}
+
+.taskflow-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.taskflow-breadcrumbs strong {
+  overflow: hidden;
+  padding: 5px 10px;
+  color: var(--foreground);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.taskflow-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-inline-start: auto;
+}
+
+.taskflow-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(270px, 26vw);
+  height: 36px;
+  padding: 0 11px;
+  color: var(--muted-foreground);
+  background: var(--card);
+  border: 1px solid var(--input);
+  border-radius: 8px;
+}
+
+.taskflow-search:focus-within {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--ring), transparent 80%);
+}
+
+.taskflow-search input {
+  width: 100%;
+  min-width: 0;
+  color: var(--foreground);
+  font: inherit;
+  font-size: 11px;
+  background: transparent;
+  border: 0;
+  outline: 0;
+}
+
+.taskflow-search input::placeholder {
+  color: var(--muted-foreground);
+}
+
+.taskflow-icon-button,
+.taskflow-top-avatar,
+.taskflow-mobile-menu {
+  display: grid;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  color: var(--muted-foreground);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+}
+
+.taskflow-icon-button:hover,
+.taskflow-mobile-menu:hover {
+  color: var(--foreground);
+  background: var(--accent);
+  border-color: var(--border);
+}
+
+.taskflow-top-avatar {
+  color: var(--foreground);
+  font-size: 12px;
+  background: var(--secondary);
+  border-color: var(--border);
+}
+
+.taskflow-top-avatar:hover {
+  border-color: var(--ring);
+}
+
+.taskflow-mobile-menu {
+  display: none;
+}
+
+.taskflow-page-content {
+  width: min(100%, 1640px);
+  margin-inline: auto;
+  padding: 26px clamp(16px, 3vw, 40px) 28px;
+}
+
+.taskflow-app-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 30px;
+  padding-top: 14px;
+  color: var(--muted-foreground);
+  border-top: 1px solid var(--border);
+  font-size: 10px;
+}
+
+.taskflow-app-footer span:first-child {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.taskflow-app-footer i {
+  width: 7px;
+  height: 7px;
+  background: var(--ring);
+  border-radius: 50%;
+}
+
+.taskflow-dashboard.compact-mode .taskflow-page-content {
+  padding-block: 16px 18px;
+}
+
+.taskflow-dashboard.compact-mode .taskflow-nav-item {
+  min-height: 32px;
+}
+
+.taskflow-mobile-backdrop {
+  display: none;
+}
+
+.taskflow-sidebar-toggle {
+  display: grid;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  color: #e4e2ed;
+  background: #23252f;
+  border: 1px solid #393c48;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.taskflow-sidebar-toggle:hover {
+  color: #fff;
+  background: #302d3b;
+  border-color: #7466a7;
+}
+
+.taskflow-sidebar-toggle:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Shared surfaces use the template's Card palette while keeping each editor's own layout. */
+.taskflow-dashboard .stat-card,
+.taskflow-dashboard .panel,
+.taskflow-dashboard .project-card,
+.taskflow-dashboard .settings-card,
+.taskflow-dashboard .planner-workbooks,
+.taskflow-dashboard .ai-chat,
+.taskflow-dashboard .provider-summary-card,
+.taskflow-dashboard .provider-card,
+.taskflow-dashboard .skills-card,
+.taskflow-dashboard .help-provider-card,
+.taskflow-dashboard .motion-controls,
+.taskflow-dashboard .motion-preview-panel,
+.taskflow-dashboard .architectural-controls,
+.taskflow-dashboard .svg-logo-ai,
+.taskflow-dashboard .svg-logo-toolbar,
+.taskflow-dashboard .svg-logo-library {
+  background: var(--card);
+  border-color: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.taskflow-dashboard .welcome-banner {
+  background:
+    radial-gradient(ellipse at 88% 0, oklch(0.488 0.243 264.376 / 18%), transparent 48%),
+    linear-gradient(140deg, var(--card), oklch(0.17 0 0));
+  border-color: var(--border);
+  border-radius: calc(var(--radius) * 1.5);
+  box-shadow: var(--shadow-md);
+}
+
+.taskflow-dashboard .primary-button,
+.taskflow-dashboard .banner-button,
+.taskflow-dashboard .planner-new-workbook,
+.taskflow-dashboard .motion-generate,
+.taskflow-dashboard .motion-continue,
+.taskflow-dashboard .architectural-generate,
+.taskflow-dashboard .skills-action-button,
+.taskflow-dashboard .provider-submit,
+.taskflow-dashboard .ai-chat-send {
+  border-radius: 8px;
+  box-shadow: var(--shadow-sm);
+}
+
+.taskflow-dashboard button:focus-visible,
+.taskflow-dashboard input:focus-visible,
+.taskflow-dashboard textarea:focus-visible,
+.taskflow-dashboard select:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+@media (min-width: 781px) {
+  .taskflow-dashboard.sidebar-collapsed .taskflow-sidebar {
+    flex-basis: 0;
+    width: 0;
+    min-width: 0;
+    padding-inline: 0;
+    overflow: hidden;
+    visibility: hidden;
+    border-inline-end-width: 0;
+    opacity: 0;
+    transition: flex-basis 180ms ease, width 180ms ease, opacity 140ms ease, padding 180ms ease;
+  }
+}
+
+@media (max-width: 1050px) {
+  .taskflow-sidebar {
+    flex-basis: 248px;
+    width: 248px;
+  }
+
+  .taskflow-topbar {
+    padding-inline: 20px;
+  }
+}
+
+@media (max-width: 780px) {
+  .taskflow-dashboard {
+    display: block;
+  }
+
+  .taskflow-sidebar {
+    position: fixed;
+    inset-block: 0;
+    inset-inline-start: 0;
+    width: min(292px, calc(100vw - 42px));
+    height: 100dvh;
+    min-height: 0;
+    transform: translateX(-105%);
+    transition: transform 220ms ease;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .taskflow-dashboard[dir="rtl"] .taskflow-sidebar {
+    transform: translateX(105%);
+  }
+
+  .taskflow-sidebar.is-open,
+  .taskflow-dashboard[dir="rtl"] .taskflow-sidebar.is-open {
+    transform: translateX(0);
+  }
+
+  .taskflow-mobile-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 19;
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: rgb(0 0 0 / 58%);
+    border: 0;
+    backdrop-filter: blur(2px);
+  }
+
+  .taskflow-topbar {
+    min-height: 58px;
+    padding-inline: 12px;
+    gap: 9px;
+  }
+
+  .taskflow-mobile-menu {
+    display: grid;
+  }
+
+  .taskflow-breadcrumbs {
+    gap: 7px;
+    font-size: 11px;
+  }
+
+  .taskflow-search {
+    width: 36px;
+    padding-inline: 9px;
+    border-color: transparent;
+    background: transparent;
+  }
+
+  .taskflow-search:focus-within {
+    width: min(200px, 38vw);
+    border-color: var(--ring);
+    background: var(--card);
+  }
+
+  .taskflow-search input {
+    width: 0;
+  }
+
+  .taskflow-search:focus-within input {
+    width: 100%;
+  }
+
+  .taskflow-topbar-actions {
+    gap: 3px;
+  }
+
+  .taskflow-page-content {
+    padding: 18px 13px 22px;
+  }
+}
+
+@media (max-width: 420px) {
+  .taskflow-topbar {
+    gap: 5px;
+  }
+
+  .taskflow-breadcrumbs > span:first-child,
+  .taskflow-breadcrumbs > span:nth-child(2) {
+    display: none;
+  }
+
+  .taskflow-app-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .taskflow-sidebar,
+  .taskflow-workspace-picker > svg {
+    transition: none;
+  }
+}

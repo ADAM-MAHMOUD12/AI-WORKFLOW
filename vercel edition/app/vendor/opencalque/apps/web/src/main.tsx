@@ -1,0 +1,45 @@
+import './migrate'
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import { blankDocument } from './actions'
+import { App } from './App'
+import { startEmbeddedBridge } from './embedded'
+import { Guard } from './Guard'
+import { setLanguage } from './i18n'
+import { usePrefs } from './prefs'
+import { loadExtensions, registry, useExtensions } from './extensions'
+import { loadDocument } from './store'
+import { startTheme } from './theme'
+import { startUpdates } from './updates'
+import './styles.css'
+
+// The language is known only now, so the first empty drawing is made here, with its page and
+// layer named in it.
+loadExtensions()
+setLanguage(usePrefs.getState().language, registry.translations)
+startTheme()
+startUpdates()
+loadDocument(blankDocument(), null)
+startEmbeddedBridge()
+
+/** Rebuilds the whole interface when the language or the unit changes; drawing and settings live outside it. */
+function Root() {
+  const language = usePrefs((p) => p.language)
+  const unit = usePrefs((p) => p.unit)
+  const fraction = usePrefs((p) => p.fraction)
+  // Extensions bring their own translations, so the language is set again when they change.
+  useExtensions((s) => s.version)
+  setLanguage(language, registry.translations)
+  return <App key={`${language} ${unit} ${fraction}`} />
+}
+
+const root = createRoot(document.getElementById('root')!)
+root.render(
+  <StrictMode>
+    <Guard>
+      <Root />
+    </Guard>
+  </StrictMode>,
+)
+
+if (import.meta.hot) import.meta.hot.dispose(() => root.unmount())
