@@ -585,9 +585,9 @@ def auth_settings() -> dict[str, bool]:
         "multi_user_enabled": True if IS_VERCEL else values.get("multi_user_enabled", False),
         "approval_required": True if IS_VERCEL else values.get("approval_required", False),
         "local_only": False if IS_VERCEL else values.get("local_only", True),
-        "engine_2d_enabled": values.get("engine_2d_enabled", True),
-        "engine_3d_enabled": values.get("engine_3d_enabled", True),
-        "engine_openfilm_enabled": values.get("engine_openfilm_enabled", True),
+        "engine_2d_enabled": True if IS_VERCEL else values.get("engine_2d_enabled", True),
+        "engine_3d_enabled": True if IS_VERCEL else values.get("engine_3d_enabled", True),
+        "engine_openfilm_enabled": True if IS_VERCEL else values.get("engine_openfilm_enabled", True),
     }
 
 def github_oauth_client_id() -> str:
