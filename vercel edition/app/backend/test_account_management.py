@@ -66,9 +66,9 @@ def test_vercel_mode_enforces_hosted_account_settings(account_test_database, mon
         "multi_user_enabled": True,
         "approval_required": True,
         "local_only": False,
-        "engine_2d_enabled": False,
-        "engine_3d_enabled": False,
-        "engine_openfilm_enabled": False,
+        "engine_2d_enabled": True,
+        "engine_3d_enabled": True,
+        "engine_openfilm_enabled": True,
     }
 
 

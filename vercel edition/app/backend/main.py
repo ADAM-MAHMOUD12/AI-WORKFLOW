@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import json
+import logging
 import re
 import sqlite3
 import uuid
@@ -42,6 +43,8 @@ from starlette.background import BackgroundTask
 from starlette.responses import FileResponse
 from starlette.responses import StreamingResponse
 from starlette.responses import JSONResponse, Response
+
+logger = logging.getLogger("taskflow")
 
 IS_VERCEL = os.getenv("VERCEL") == "1"
 
@@ -582,9 +585,9 @@ def auth_settings() -> dict[str, bool]:
         "multi_user_enabled": True if IS_VERCEL else values.get("multi_user_enabled", False),
         "approval_required": True if IS_VERCEL else values.get("approval_required", False),
         "local_only": False if IS_VERCEL else values.get("local_only", True),
-        "engine_2d_enabled": False if IS_VERCEL else values.get("engine_2d_enabled", True),
-        "engine_3d_enabled": False if IS_VERCEL else values.get("engine_3d_enabled", True),
-        "engine_openfilm_enabled": False if IS_VERCEL else values.get("engine_openfilm_enabled", True),
+        "engine_2d_enabled": values.get("engine_2d_enabled", True),
+        "engine_3d_enabled": values.get("engine_3d_enabled", True),
+        "engine_openfilm_enabled": values.get("engine_openfilm_enabled", True),
     }
 
 def github_oauth_client_id() -> str:
@@ -991,9 +994,16 @@ async def github_copilot_request(
             detail="GitHub Copilot could not start because its runtime cache is not writable on this host.",
         ) from exc
     except (RuntimeError, TimeoutError, ValueError) as exc:
+        logger.warning("GitHub Copilot SDK failed with %s: %s", type(exc).__name__, exc)
         raise HTTPException(
             status_code=502,
             detail="GitHub Copilot could not complete the request. Confirm this GitHub account has Copilot access and the local Copilot runtime is installed.",
+        ) from exc
+    except Exception as exc:
+        logger.exception("GitHub Copilot SDK request raised an unexpected %s", type(exc).__name__)
+        raise HTTPException(
+            status_code=502,
+            detail=f"GitHub Copilot SDK failed ({type(exc).__name__}). Confirm Copilot access for the linked GitHub account.",
         ) from exc
 
     content = getattr(getattr(response, "data", None), "content", None)
@@ -1862,7 +1872,7 @@ async def require_user_session_for_multi_user_api(request: Request, call_next):
                 "/api/speech/",
                 "/api/w2m/vision/",
                 "/api/motion/",
-                "/api/aedifex/",
+                "/api/aedifex/scenes",
             ))
             or path in {
                 "/api/programming/run",
@@ -5717,7 +5727,7 @@ async def embed_commons_image(url: str):
     parsed = urlparse(url)
     allowed_hosts = {"commons.wikimedia.org", "upload.wikimedia.org", "thumb.wikimedia.org", "upload.wikimedia.org"}
     if parsed.scheme != "https" or parsed.hostname not in allowed_hosts:
-        raise HTTPException(status_code=400, detail="رابط Ø§Ù„ØµÙˆرة ØºÙŠر Ù…Ø¯Ø¹ÙˆÙ….")
+        raise HTTPException(status_code=400, detail="رابط الصورة غير مدعوم.")
     try:
         async with httpx.AsyncClient(timeout=20, follow_redirects=True, headers={
             "User-Agent": "AI-TaskFlow/1.0 (local image embed)",
@@ -5728,7 +5738,7 @@ async def embed_commons_image(url: str):
             content_type = response.headers.get("content-type", "").lower()
     except httpx.HTTPError as exc:
         if sys.platform != "win32":
-            raise HTTPException(status_code=502, detail="ØªØ¹Ø°Ù‘ر ØªÙ†Ø²ÙŠÙ„ Ø§Ù„ØµÙˆرة.") from exc
+            raise HTTPException(status_code=502, detail="تعذّر تنزيل الصورة.") from exc
         try:
             process = await asyncio.to_thread(
                 subprocess.run,
@@ -5740,22 +5750,22 @@ async def embed_commons_image(url: str):
                 check=False,
             )
             if process.returncode != 0:
-                raise HTTPException(status_code=502, detail="ØªØ¹Ø°Ù‘ر ØªÙ†Ø²ÙŠÙ„ Ø§Ù„ØµÙˆرة.")
+                raise HTTPException(status_code=502, detail="تعذّر تنزيل الصورة.")
             response_content = process.stdout
             content_type = "image/jpeg" if response_content.startswith(b"\xff\xd8") else "image/png" if response_content.startswith(b"\x89PNG") else "image/webp" if response_content.startswith(b"RIFF") else ""
         except OSError as exc_fallback:
-            raise HTTPException(status_code=502, detail="ØªØ¹Ø°Ù‘ر ØªÙ†Ø²ÙŠÙ„ Ø§Ù„ØµÙˆرة.") from exc_fallback
+            raise HTTPException(status_code=502, detail="تعذّر تنزيل الصورة.") from exc_fallback
     if not content_type.startswith("image/"):
-        raise HTTPException(status_code=415, detail="Ø§Ù„رابط Ù„ا ÙŠØ­ØªÙˆÙŠ ØµÙˆرة ØµØ§Ù„حة.")
+        raise HTTPException(status_code=415, detail="الرابط لا يحتوي صورة صالحة.")
     if len(response_content) > 10 * 1024 * 1024:
-        raise HTTPException(status_code=413, detail="Ø§Ù„ØµÙˆرة Ø£Ùƒبر Ù…Ù† Ø§Ù„حد Ø§Ù„Ù…Ø³Ù…Ùˆح.")
+        raise HTTPException(status_code=413, detail="الصورة أكبر من الحد المسموح.")
     return Response(content=response_content, media_type=content_type.split(";", 1)[0], headers={"Cache-Control": "public, max-age=86400"})
 
 @app.get("/api/images/search")
 async def search_commons_images(query: str = "", limit: int = 8):
     query = query.strip()[:120]
     if len(query) < 2:
-        raise HTTPException(status_code=422, detail="Ø£Ø¯Ø®Ù„ عبارة بحث Ùˆاضحة Ù„ØµÙˆرة.")
+        raise HTTPException(status_code=422, detail="أدخل عبارة بحث واضحة للصورة.")
 
     arabic_aliases = {
         "ستيف جوبز": "Steve Jobs",
@@ -5822,7 +5832,7 @@ async def search_commons_images(query: str = "", limit: int = 8):
             data = response.json()
     except (httpx.HTTPError, json.JSONDecodeError):
         if sys.platform != "win32":
-            raise HTTPException(status_code=502, detail="ØªØ¹Ø°Ù‘ر Ø§Ù„Ø§ØªØµØ§Ù„ Ø¨Ù…Ùƒتبة Wikimedia Commons Ø­Ø§Ù„ÙŠØ§Ù‹.")
+            raise HTTPException(status_code=502, detail="تعذّر الاتصال بمكتبة Wikimedia Commons حاليًا.")
         try:
             process = await asyncio.to_thread(
                 subprocess.run,
@@ -5835,10 +5845,10 @@ async def search_commons_images(query: str = "", limit: int = 8):
                 check=False,
             )
             if process.returncode != 0:
-                raise HTTPException(status_code=502, detail="ØªØ¹Ø°Ù‘ر Ø§Ù„Ø§ØªØµØ§Ù„ Ø¨Ù…Ùƒتبة Wikimedia Commons Ø­Ø§Ù„ÙŠØ§Ù‹.")
+                raise HTTPException(status_code=502, detail="تعذّر الاتصال بمكتبة Wikimedia Commons حاليًا.")
             data = json.loads(process.stdout.decode("utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
-            raise HTTPException(status_code=502, detail="ØªØ¹Ø°Ù‘ر Ø§Ù„Ø§ØªØµØ§Ù„ Ø¨Ù…Ùƒتبة Wikimedia Commons Ø­Ø§Ù„ÙŠØ§Ù‹.") from exc
+            raise HTTPException(status_code=502, detail="تعذّر الاتصال بمكتبة Wikimedia Commons حاليًا.") from exc
 
     pages = {}
     for page in data.get("query", {}).get("pages", []):

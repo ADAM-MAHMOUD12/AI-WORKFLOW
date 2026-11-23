@@ -118,6 +118,18 @@ def test_github_copilot_runtime_uses_writable_vercel_cache(tmp_path, monkeypatch
     assert (runtime_home / ".cache").is_dir()
 
 
+def test_github_copilot_reports_unexpected_sdk_errors_with_class(monkeypatch):
+    monkeypatch.setattr(main, "github_linked_access_token", lambda _user_id: "gho-test-token")
+    monkeypatch.setattr(main, "CopilotClient", lambda **_options: (_ for _ in ()).throw(LookupError("sdk lookup failed")))
+    monkeypatch.setattr(main, "RuntimeConnection", FakeRuntimeConnection)
+
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(main.github_copilot_request({"id": "user-1"}, "Hello"))
+
+    assert error.value.status_code == 502
+    assert "LookupError" in error.value.detail
+
+
 def test_github_copilot_reports_unwritable_runtime_as_service_error(monkeypatch):
     monkeypatch.setattr(main, "github_linked_access_token", lambda _user_id: "gho-test-token")
     monkeypatch.setattr(main, "CopilotClient", lambda **_options: (_ for _ in ()).throw(OSError("read-only cache")))
