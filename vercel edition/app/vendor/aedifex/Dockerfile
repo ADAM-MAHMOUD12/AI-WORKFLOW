@@ -48,7 +48,7 @@ ENV NODE_ENV=production \
     AEDIFEX_AUTH=proxy \
     AEDIFEX_DATA_DIR=/data
 
-COPY --from=build --chown=node:node /app/packages/cli/build/runtime ./
+COPY --from=build --chown=node:node /app/packages/cli/dist/runtime ./
 
 # Saved scenes live in SQLite under AEDIFEX_DATA_DIR; owned by the runtime user so
 # the store can create the database on first write.
