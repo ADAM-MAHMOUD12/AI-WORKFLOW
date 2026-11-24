@@ -18,6 +18,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { countGraphNodes, isEmptyGraphOverwrite } from '@/lib/empty-graph-guard'
 import { useLocalArtifactStore } from '@/lib/local-artifact-store'
+import { hostedSceneApiPath } from '@/lib/hosted-api'
 import {
   isPendingSceneGraphEcho,
   type PersistedSceneGraph,
@@ -213,7 +214,7 @@ function SceneEditor({ initialScene, meta: initialMeta }: SceneLoaderProps) {
   const handleRename = useCallback(
     async (name: string) => {
       try {
-        const response = await fetch(`/api/scenes/${meta.id}`, {
+        const response = await fetch(hostedSceneApiPath(`/api/scenes/${meta.id}`), {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -266,7 +267,7 @@ function SceneEditor({ initialScene, meta: initialMeta }: SceneLoaderProps) {
 
       pendingGraphSignaturesRef.current.add(graphJson)
       try {
-        const response = await fetch(`/api/scenes/${meta.id}`, {
+        const response = await fetch(hostedSceneApiPath(`/api/scenes/${meta.id}`), {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -353,7 +354,7 @@ function SceneEditor({ initialScene, meta: initialMeta }: SceneLoaderProps) {
   const handleThumb = useCallback(
     async (blob: Blob, cameraData: { requestId?: string }) => {
       if (cameraData.requestId) return
-      await fetch(`/api/scenes/${meta.id}/thumbnail`, {
+      await fetch(hostedSceneApiPath(`/api/scenes/${meta.id}/thumbnail`), {
         method: 'POST',
         headers: { 'Content-Type': 'image/webp' },
         body: blob,

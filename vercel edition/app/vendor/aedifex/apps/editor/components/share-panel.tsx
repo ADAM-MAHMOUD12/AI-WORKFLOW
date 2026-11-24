@@ -3,6 +3,7 @@
 import { Check, Copy, ExternalLink } from 'lucide-react'
 import { type KeyboardEvent, type RefObject, useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
+import { hostedSceneApiPath } from '@/lib/hosted-api'
 
 interface SharePanelProps {
   sceneId: string
@@ -18,7 +19,7 @@ const SMALL_BUTTON =
   'inline-flex shrink-0 items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 font-medium text-xs transition-colors hover:bg-accent'
 
 async function readShared(sceneId: string): Promise<boolean> {
-  const response = await fetch(`/api/scenes/${encodeURIComponent(sceneId)}/share`, {
+  const response = await fetch(hostedSceneApiPath(`/api/scenes/${encodeURIComponent(sceneId)}/share`), {
     cache: 'no-store',
   })
   if (!response.ok) throw new Error(`share state ${response.status}`)
@@ -27,7 +28,7 @@ async function readShared(sceneId: string): Promise<boolean> {
 }
 
 async function writeShared(sceneId: string, shared: boolean): Promise<boolean> {
-  const response = await fetch(`/api/scenes/${encodeURIComponent(sceneId)}/share`, {
+  const response = await fetch(hostedSceneApiPath(`/api/scenes/${encodeURIComponent(sceneId)}/share`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ shared }),

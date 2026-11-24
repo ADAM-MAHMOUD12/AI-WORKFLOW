@@ -5,6 +5,7 @@ import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useCallback, useState } from 'react'
 import { PRIMARY_PILL } from './app-shell'
+import { hostedSceneApiPath } from '@/lib/hosted-api'
 
 const EMPTY_GRAPH: SceneGraph = {
   nodes: {},
@@ -25,7 +26,7 @@ export function CreateProjectButton({ nextNumber }: { nextNumber: number }) {
     setIsCreating(true)
     setError(null)
     try {
-      const response = await fetch('/api/scenes', {
+      const response = await fetch(hostedSceneApiPath('/api/scenes'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: `Project #${nextNumber}`, graph: EMPTY_GRAPH }),

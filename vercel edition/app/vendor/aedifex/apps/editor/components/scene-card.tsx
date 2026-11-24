@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
+import { hostedSceneApiPath } from '@/lib/hosted-api'
 import { AedifexMark, PRIMARY_PILL, SECONDARY_PILL } from './app-shell'
 
 export interface SceneCardData {
@@ -182,7 +183,7 @@ function RenameDialog({ scene, onClose }: { scene: SceneCardData; onClose: () =>
     setPending(true)
     setError(null)
     try {
-      const response = await fetch(`/api/scenes/${scene.id}`, {
+      const response = await fetch(hostedSceneApiPath(`/api/scenes/${scene.id}`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'If-Match': `"${scene.version}"` },
         body: JSON.stringify({ name: trimmed }),
@@ -246,7 +247,7 @@ function DeleteDialog({ scene, onClose }: { scene: SceneCardData; onClose: () =>
     setPending(true)
     setError(null)
     try {
-      const response = await fetch(`/api/scenes/${scene.id}`, {
+      const response = await fetch(hostedSceneApiPath(`/api/scenes/${scene.id}`), {
         method: 'DELETE',
         headers: { 'If-Match': `"${scene.version}"` },
       })

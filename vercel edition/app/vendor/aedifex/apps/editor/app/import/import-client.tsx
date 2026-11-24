@@ -4,6 +4,7 @@ import { type ValidateBuildJsonResult, validateBuildJson } from '@aedifex/core'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { MAX_IMPORT_BYTES, parseImportSrc } from '@/lib/import-src'
+import { hostedSceneApiPath } from '@/lib/hosted-api'
 
 type Phase =
   | { kind: 'fetching' }
@@ -105,7 +106,7 @@ export function ImportClient({ src, name }: { src: string | null; name: string |
     const review = phase.result
     setPhase({ kind: 'creating', result: review })
     try {
-      const response = await fetch('/api/scenes', {
+      const response = await fetch(hostedSceneApiPath('/api/scenes'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

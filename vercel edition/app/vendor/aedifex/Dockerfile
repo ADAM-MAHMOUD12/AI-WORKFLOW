@@ -24,6 +24,8 @@ ENV AEDIFEX_PORTABLE_BUILD=1 \
     VERCEL=1 \
     AEDIFEX_BASE_PATH=/engine/3d \
     AEDIFEX_AUTH=proxy \
+    AEDIFEX_SCENE_API_ORIGINS=https://ai-taskflow-vercel-edition.vercel.app \
+    AEDIFEX_PUBLIC_URL=https://ai-taskflow-vercel-edition.vercel.app/engine/3d \
     AEDIFEX_DATA_DIR=/tmp/aedifex
 RUN ./node_modules/.bin/turbo run build --filter=editor
 RUN cd packages/cli && bun run build && bun run stage-runtime
@@ -46,6 +48,8 @@ ENV NODE_ENV=production \
     VERCEL=1 \
     AEDIFEX_BASE_PATH=/engine/3d \
     AEDIFEX_AUTH=proxy \
+    AEDIFEX_SCENE_API_ORIGINS=https://ai-taskflow-vercel-edition.vercel.app \
+    AEDIFEX_PUBLIC_URL=https://ai-taskflow-vercel-edition.vercel.app/engine/3d \
     AEDIFEX_DATA_DIR=/data
 
 COPY --from=build --chown=node:node /app/packages/cli/dist/runtime ./
