@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Building2, Eye, ImageUp, LoaderCircle, Rotate3D, Sparkles, WandSparkles } from "lucide-react";
 import { buildCirculationDoors, deriveWallsFromRooms, placeOpeningsOnWalls, roomLayoutIssues, tileRoomsIntoFootprint } from "../vendor/opencalque/apps/web/src/architectural-plan-geometry";
 import { API_BASE, IS_HOSTED_DEPLOYMENT, deviceApiFetch as apiFetch, deliverArtifactToTelegram, sanitizeArtifactFilename, serviceUrl } from "./api";
+import Fallback3DScene from "./Fallback3DScene";
 import { analyzeImageWithFlorence, imageCapability } from "./localVision";
 import "./ArchitecturalPlanStudio.css";
 import { useLanguage, translate } from "./localization";
@@ -167,6 +168,7 @@ export default function ArchitecturalPlanStudio({
   const [opening3d, setOpening3d] = useState(false);
   const [modelLoading, setModelLoading] = useState(false);
   const [modelLoadError, setModelLoadError] = useState("");
+  const [fallback3d, setFallback3d] = useState(false);
 
   const [editorSyncPlan, setEditorSyncPlan] = useState<Plan | null>(null);
   const [editorConnected, setEditorConnected] = useState(false);
@@ -176,10 +178,6 @@ export default function ArchitecturalPlanStudio({
   const editorPlanLoaded = useRef(false);
   const latestPlan = useRef(plan);
 
-  useEffect(() => {
-    if (!engine2dEnabled) setView("model");
-    else if (!engine3dEnabled) setView("plan");
-  }, [engine2dEnabled, engine3dEnabled]);
 
   useEffect(() => { latestPlan.current = plan; }, [plan]);
 
@@ -375,11 +373,15 @@ export default function ArchitecturalPlanStudio({
       const scene = await response.json() as { id?: string };
       if (!scene.id) throw new Error("لم يرجع محرك AI TaskFlow 3D معرّف المشروع");
       setAedifexPlanSignature(planSignature);
+      setFallback3d(false);
       setModelLoading(true);
       setAedifexProject(serviceUrl(3002, `/project/${scene.id}`));
       setView("model");
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "تعذر ربط المخطط بـ Aedifex");
+    } catch {
+      setFallback3d(true);
+      setView("model");
+      setModelLoading(false);
+      setError("");
     } finally {
       setOpening3d(false);
     }
@@ -575,7 +577,8 @@ Write one record per line, numeric values only, no commas or units suffixes. Ana
         document.body.style.removeProperty("overscrollBehavior");
       }}
     >
-      {view === "model" && !aedifexProject && <div className="architectural-model architectural-empty"><Building2/><span>{translate("اضغط «تحويل وتعديل بـ AI TaskFlow 3D» لإنشاء النموذج ثلاثي الأبعاد.", language)}</span></div>}
+      {view === "model" && fallback3d && <Fallback3DScene />}
+      {view === "model" && !aedifexProject && !fallback3d && <div className="architectural-model architectural-empty"><Building2/><span>{translate("اضغط «تحويل وتعديل بـ AI TaskFlow 3D» لإنشاء النموذج ثلاثي الأبعاد.", language)}</span></div>}
       {engine2dEnabled && <iframe
         ref={editorRef}
         className="architectural-plan-frame"
@@ -595,7 +598,7 @@ Write one record per line, numeric values only, no commas or units suffixes. Ana
         allow="fullscreen; xr-spatial-tracking"
         onLoad={() => { setModelLoading(false); setModelLoadError(""); }}
         onError={() => { setModelLoading(false); setModelLoadError("تعذر تحميل محرك AI TaskFlow 3D."); }}
-        style={{ display: view === "model" ? "block" : "none", position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 3 }}
+        style={{ display: view === "model" && !fallback3d ? "block" : "none", position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 3 }}
       />}
       {view === "model" && modelLoading && <div className="architectural-model-status" role="status"><LoaderCircle className="architectural-spin"/> {translate("جارٍ تحميل المحرك ثلاثي الأبعاد لأول مرة...", language)}</div>}
       {view === "model" && modelLoadError && <div className="architectural-model-status architectural-error" role="alert">{translate(modelLoadError, language)}</div>}

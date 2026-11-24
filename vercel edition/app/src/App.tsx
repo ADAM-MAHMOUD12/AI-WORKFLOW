@@ -54,7 +54,8 @@ import ContentEditingStudio from "./ContentEditingStudio";
 import DocumentAttachments, { documentsAsContext, type TextDocument } from "./DocumentAttachments";
 import AuthGate from "./AuthGate";
 import { useAuth } from "./authContext";
-import { API_BASE, deviceApiFetch as apiFetch, serviceUrl } from "./api";
+import { API_BASE, IS_HOSTED_DEPLOYMENT, deviceApiFetch as apiFetch, serviceUrl } from "./api";
+import Fallback3DScene from "./Fallback3DScene";
 import { saveLanguage, translate, useLanguage } from "./localization";
 import ServerAccessSettings from "./ServerAccessSettings";
 import TelegramBotSettings from "./TelegramBotSettings";
@@ -1098,11 +1099,11 @@ function WorkspaceApp() {
             document.body.style.removeProperty("overscrollBehavior");
           }}
         >
-          <iframe
+          {IS_HOSTED_DEPLOYMENT ? <Fallback3DScene /> : <iframe
             src={serviceUrl(3002)}
             title="AI TaskFlow 3D"
             allow="fullscreen; xr-spatial-tracking"
-          />
+          />}
         </section>
       );
     }
