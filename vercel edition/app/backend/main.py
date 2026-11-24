@@ -4970,6 +4970,8 @@ async def update_motion_editor_project(
 async def create_aedifex_scene(payload: dict[str, Any]):
     """Create a scene in AI TaskFlow 3D and normalize its graph for the editor API."""
     aedifex_url = os.getenv("AEDIFEX_URL", "").strip().rstrip("/")
+    if aedifex_url:
+        aedifex_url = f"{aedifex_url}/engine/3d/api/scenes" if IS_VERCEL else aedifex_url
     if not aedifex_url:
         if IS_VERCEL:
             public_origin = os.getenv("TASKFLOW_PUBLIC_URL", "").strip().rstrip("/")
