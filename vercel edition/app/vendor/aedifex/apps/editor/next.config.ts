@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import type { NextConfig } from 'next'
 
 const appDirectory = path.dirname(fileURLToPath(import.meta.url))
-const portableBuild = process.env.AEDIFEX_PORTABLE_BUILD === '1' || process.env.VERCEL === '1'
+const portableBuild = process.env.AEDIFEX_PORTABLE_BUILD === '1'
 const hostedBasePath = process.env.AEDIFEX_BASE_PATH === '/engine/3d' || process.env.VERCEL === '1' ? '/engine/3d' : ''
 
 const nextConfig: NextConfig = {
