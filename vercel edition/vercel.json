@@ -9,18 +9,10 @@
       "root": "app/backend",
       "framework": "fastapi",
       "entrypoint": "main:app",
-      "installCommand": "pip install -r requirements-vercel.txt",
-      "bindings": [
-        {
-          "type": "service",
-          "service": "engine3d",
-          "format": "url",
-          "env": "AEDIFEX_URL"
-        }
-      ]
+      "installCommand": "pip install -r requirements-vercel.txt"
     },
     "engine3d": {
-      "root": "app/vendor/aedifex",
+      "root": "app/vendor/aedifex/apps/editor",
       "framework": "nextjs"
     }
   },
