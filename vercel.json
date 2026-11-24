@@ -1,0 +1,53 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "app": {
+      "root": "vercel edition/app",
+      "framework": "vite"
+    },
+    "backend": {
+      "root": "vercel edition/app/backend",
+      "framework": "fastapi",
+      "entrypoint": "main:app",
+      "installCommand": "pip install -r requirements-vercel.txt",
+      "bindings": [
+        {
+          "type": "service",
+          "service": "engine3d",
+          "format": "url",
+          "env": "AEDIFEX_URL"
+        }
+      ]
+    },
+    "engine3d": {
+      "root": "vercel edition/app/vendor/aedifex",
+      "framework": "nextjs"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/engine/3d",
+      "destination": {
+        "service": "engine3d"
+      }
+    },
+    {
+      "source": "/engine/3d/(.*)",
+      "destination": {
+        "service": "engine3d"
+      }
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": {
+        "service": "backend"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "app"
+      }
+    }
+  ]
+}
