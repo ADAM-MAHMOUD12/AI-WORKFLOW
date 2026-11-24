@@ -20,7 +20,11 @@ RUN bun install --frozen-lockfile
 # The image ships the same portable runtime as `npx @aedifex/cli editor`:
 # Next's standalone output, pruned of sources and build-only files by the CLI's
 # staging script. One artifact, two distribution channels.
-ENV AEDIFEX_PORTABLE_BUILD=1
+ENV AEDIFEX_PORTABLE_BUILD=1 \
+    VERCEL=1 \
+    AEDIFEX_BASE_PATH=/engine/3d \
+    AEDIFEX_AUTH=proxy \
+    AEDIFEX_DATA_DIR=/tmp/aedifex
 RUN ./node_modules/.bin/turbo run build --filter=editor
 RUN cd packages/cli && bun run build && bun run stage-runtime
 
@@ -39,6 +43,9 @@ LABEL org.opencontainers.image.title="Aedifex editor" \
 ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0 \
     PORT=3000 \
+    VERCEL=1 \
+    AEDIFEX_BASE_PATH=/engine/3d \
+    AEDIFEX_AUTH=proxy \
     AEDIFEX_DATA_DIR=/data
 
 COPY --from=build --chown=node:node /app/packages/cli/build/runtime ./
