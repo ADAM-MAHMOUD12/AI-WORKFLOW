@@ -17,14 +17,6 @@
           "format": "url",
           "env": "AEDIFEX_URL"
         }
-      ],
-      "bindings": [
-        {
-          "type": "service",
-          "service": "engine-three",
-          "format": "url",
-          "env": "AEDIFEX_URL"
-        }
       ]
     },
     "engine-three": {
@@ -38,27 +30,19 @@
   "rewrites": [
     {
       "source": "/engine/3d",
-      "destination": {
-        "service": "engine-three"
-      }
+      "destination": { "service": "engine-three" }
     },
     {
       "source": "/engine/3d/(.*)",
-      "destination": {
-        "service": "engine-three"
-      }
+      "destination": { "service": "engine-three" }
     },
     {
       "source": "/api/(.*)",
-      "destination": {
-        "service": "backend"
-      }
+      "destination": { "service": "backend" }
     },
     {
       "source": "/(.*)",
-      "destination": {
-        "service": "app"
-      }
+      "destination": { "service": "app" }
     }
   ]
 }
