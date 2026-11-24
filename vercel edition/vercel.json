@@ -11,7 +11,7 @@
       "entrypoint": "main:app",
       "installCommand": "pip install -r requirements-vercel.txt"
     },
-    "engine3d": {
+    "engine-three": {
       "root": "app/vendor/aedifex/apps/editor",
       "framework": "nextjs"
     }
@@ -20,13 +20,13 @@
     {
       "source": "/engine/3d",
       "destination": {
-        "service": "engine3d"
+        "service": "engine-three"
       }
     },
     {
       "source": "/engine/3d/(.*)",
       "destination": {
-        "service": "engine3d"
+        "service": "engine-three"
       }
     },
     {

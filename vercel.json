@@ -13,13 +13,13 @@
       "bindings": [
         {
           "type": "service",
-          "service": "engine3d",
+          "service": "engine-three",
           "format": "url",
           "env": "AEDIFEX_URL"
         }
       ]
     },
-    "engine3d": {
+    "engine-three": {
       "root": "vercel edition/app/vendor/aedifex",
       "framework": "nextjs"
     }
@@ -28,13 +28,13 @@
     {
       "source": "/engine/3d",
       "destination": {
-        "service": "engine3d"
+        "service": "engine-three"
       }
     },
     {
       "source": "/engine/3d/(.*)",
       "destination": {
-        "service": "engine3d"
+        "service": "engine-three"
       }
     },
     {
