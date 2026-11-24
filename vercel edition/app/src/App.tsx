@@ -54,7 +54,7 @@ import ContentEditingStudio from "./ContentEditingStudio";
 import DocumentAttachments, { documentsAsContext, type TextDocument } from "./DocumentAttachments";
 import AuthGate from "./AuthGate";
 import { useAuth } from "./authContext";
-import { API_BASE, IS_HOSTED_DEPLOYMENT, deviceApiFetch as apiFetch, serviceUrl } from "./api";
+import { API_BASE, deviceApiFetch as apiFetch, serviceUrl } from "./api";
 import Fallback3DScene from "./Fallback3DScene";
 import { saveLanguage, translate, useLanguage } from "./localization";
 import ServerAccessSettings from "./ServerAccessSettings";
@@ -261,6 +261,7 @@ function WorkspaceApp() {
   const [showHelp, setShowHelp] = useState(false);
   const [show3DLauncher, setShow3DLauncher] = useState(false);
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
+  const [fallback3d, setFallback3d] = useState(false);
   const [creatingWorkspace, setCreatingWorkspace] = useState(false);
   const [workspaceNameInput, setWorkspaceNameInput] = useState("");
   const workspaceSwitcher = useRef<HTMLDivElement>(null);
@@ -1099,10 +1100,11 @@ function WorkspaceApp() {
             document.body.style.removeProperty("overscrollBehavior");
           }}
         >
-          {IS_HOSTED_DEPLOYMENT ? <Fallback3DScene /> : <iframe
+          {fallback3d ? <Fallback3DScene /> : <iframe
             src={serviceUrl(3002)}
             title="AI TaskFlow 3D"
             allow="fullscreen; xr-spatial-tracking"
+            onError={() => setFallback3d(true)}
           />}
         </section>
       );
