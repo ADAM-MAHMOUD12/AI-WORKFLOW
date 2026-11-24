@@ -21,8 +21,8 @@
     },
     "engine-three": {
       "root": "vercel edition/app/vendor/aedifex",
-      "runtime": "docker",
-      "dockerfile": "Dockerfile"
+      "runtime": "container",
+      "entrypoint": "Dockerfile"
     }
   },
   "rewrites": [
