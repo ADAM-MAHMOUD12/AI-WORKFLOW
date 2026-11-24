@@ -23,7 +23,7 @@
       "root": "app/vendor/aedifex",
       "framework": "nextjs",
       "installCommand": "npx --yes bun@1.4.4 install --frozen-lockfile",
-      "buildCommand": "npx --yes bun@1.4.4 run turbo run build --filter=./apps/editor... --concurrency=1",
+      "buildCommand": "npx --yes bun@1.4.4 run turbo run build --filter=./apps/editor... --concurrency=1 && rm -rf apps/editor/.next/cache",
       "outputDirectory": "apps/editor/.next"
     }
   },
