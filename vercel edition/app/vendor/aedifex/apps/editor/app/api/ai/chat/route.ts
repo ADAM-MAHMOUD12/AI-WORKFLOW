@@ -16,14 +16,107 @@ import {
 // API Route Handler
 // ============================================================================
 
-export async function POST(request: NextRequest) {
-  if (!AI_API_KEY) {
-    return NextResponse.json(
-      { error: 'AI service not configured. AI_API_KEY is missing.' },
-      { status: 503 },
-    )
-  }
+async function taskflowChatStream(
+  request: NextRequest,
+  message: string,
+  systemPrompt: string,
+  history: Array<{ role: string; content: string }>,
+): Promise<Response | null> {
+  const session =
+    request.headers.get('x-taskflow-session')?.trim() ??
+    request.headers.get('authorization')?.replace(/^Bearer\s+/i, '').trim()
+  if (!session) return null
 
+  const publicUrl = (
+    process.env.TASKFLOW_PUBLIC_URL ?? 'https://ai-taskflow-vercel-edition.vercel.app'
+  ).replace(/\/$/, '')
+
+  try {
+    const providersResponse = await fetch(`${publicUrl}/api/providers`, {
+      headers: { Authorization: `Bearer ${session}`, Accept: 'application/json' },
+      cache: 'no-store',
+      signal: request.signal,
+    })
+    if (!providersResponse.ok) return null
+    const providers = await providersResponse.json() as Array<{ id: string; is_default?: boolean }>
+    const providerId = providers.find((provider) => provider.is_default)?.id ?? providers[0]?.id
+    if (!providerId) return null
+
+    const upstream = await fetch(`${publicUrl}/api/chat/stream`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${session}`,
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+      },
+      body: JSON.stringify({
+        provider_id: providerId,
+        message,
+        system_prompt: systemPrompt,
+        history,
+        temperature: 0.7,
+        max_tokens: AI_CHAT_MAX_TOKENS,
+        images: [],
+      }),
+      signal: request.signal,
+    })
+    if (!upstream.ok || !upstream.body) {
+      const detail = await upstream.text().catch(() => '')
+      return NextResponse.json({ error: detail || 'TaskFlow AI provider failed.' }, { status: upstream.status })
+    }
+
+    const reader = upstream.body.getReader()
+    const decoder = new TextDecoder()
+    let pending = ''
+    const encoder = new TextEncoder()
+
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        try {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            pending += decoder.decode(value, { stream: true })
+            const lines = pending.split(/\n/)
+            pending = lines.pop() ?? ''
+            for (const line of lines) {
+              if (!line.startsWith('data:')) continue
+              const raw = line.slice(5).trim()
+              if (!raw) continue
+              try {
+                const event = JSON.parse(raw) as { type?: string; text?: string; message?: string }
+                if (event.type === 'delta' && typeof event.text === 'string') {
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: event.text }, finish_reason: null }] })}\n\n`))
+                } else if (event.type === 'error' && event.message) {
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: event.message })}\n\n`))
+                } else if (event.type === 'done') {
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }] })}\n\n`))
+                }
+              } catch {
+                // Ignore malformed upstream SSE frames.
+              }
+            }
+          }
+        } finally {
+          controller.close()
+        }
+      },
+    })
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+      },
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'TaskFlow AI provider unavailable.'
+    return NextResponse.json({ error: message }, { status: 502 })
+  }
+}
+
+export async function POST(request: NextRequest) {
   let body: unknown
   try {
     body = await request.json()
@@ -43,6 +136,24 @@ export async function POST(request: NextRequest) {
   const { messages, catalogSummary, sceneContext, roomPresetSummary } = result.value
 
   const systemPrompt = buildSystemPrompt(catalogSummary, sceneContext, roomPresetSummary)
+
+  const lastUser = [...messages].reverse().find((item) => item.role === 'user')
+  const taskflowMessage = lastUser ? extractChatMessageText(lastUser.content) : ''
+  if (taskflowMessage) {
+    const history = messages.slice(0, -1).map((item) => ({
+      role: item.role,
+      content: extractChatMessageText(item.content),
+    }))
+    const taskflowResponse = await taskflowChatStream(request, taskflowMessage, systemPrompt, history)
+    if (taskflowResponse) return taskflowResponse
+  }
+
+  if (!AI_API_KEY) {
+    return NextResponse.json(
+      { error: 'AI service not configured. AI_API_KEY is missing.' },
+      { status: 503 },
+    )
+  }
 
   // DRY A-D5: Use shared factory function
   const openai = createAIClient()

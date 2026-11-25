@@ -93,9 +93,15 @@ async function processStream(
   callbacks: StreamCallbacks,
   signal: AbortSignal,
 ): Promise<void> {
+  const taskflowSession = typeof window !== 'undefined'
+    ? window.localStorage.getItem('taskflow-auth-session-v1')
+    : null
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (taskflowSession) headers['X-TaskFlow-Session'] = taskflowSession
+
   const response = await fetch('/api/ai/chat', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(request),
     signal,
   })
