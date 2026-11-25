@@ -55,7 +55,14 @@ const sectionCommands: Record<Section, string[]> = {
 };
 
 async function readJson<T>(response: Response): Promise<T> {
-  const result = await response.json() as { detail?: unknown };
+  let result: { detail?: unknown };
+  try {
+    result = await response.json() as { detail?: unknown };
+  } catch {
+    throw new Error(response.ok
+      ? "الخادم أرجع استجابة غير JSON صالحة."
+      : `تعذّر إكمال الطلب (${response.status}).`);
+  }
   if (!response.ok) {
     const detail = result.detail;
     if (typeof detail === "string") throw new Error(detail);

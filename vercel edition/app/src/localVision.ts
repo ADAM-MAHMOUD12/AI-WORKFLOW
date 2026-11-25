@@ -1,4 +1,3 @@
-import { API_BASE, deviceApiFetch as apiFetch } from "./api";
 
 export type ImageCapability = "yes" | "no" | "unknown";
 
@@ -41,22 +40,58 @@ export async function analyzeImageWithFlorence(
   signal?: AbortSignal,
 ): Promise<string> {
   const image = await normalizeImage(imageData, signal);
-  const response = await apiFetch(`${API_BASE}/api/w2m/vision/analyze`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    signal,
-    body: JSON.stringify({ image, mode: "caption" }),
-  });
-  const result: unknown = await response.json();
-  if (!response.ok) {
-    const detail = typeof result === "object" && result !== null && "detail" in result &&
-      typeof result.detail === "string" ? result.detail : "تعذّر تحليل الصورة باستخدام Florence-2 المحلي.";
-    throw new Error(detail);
+  const img = new Image();
+  img.src = image;
+  await img.decode();
+
+  const canvas = document.createElement("canvas");
+  const width = 96;
+  const height = Math.max(1, Math.round(width * img.naturalHeight / img.naturalWidth));
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) throw new Error("تعذّر تحليل الصورة في المتصفح.");
+  context.drawImage(img, 0, 0, width, height);
+  const pixels = context.getImageData(0, 0, width, height).data;
+
+  let red = 0;
+  let green = 0;
+  let blue = 0;
+  let luminance = 0;
+  let count = 0;
+  let dark = 0;
+  let bright = 0;
+  for (let i = 0; i < pixels.length; i += 16) {
+    red += pixels[i];
+    green += pixels[i + 1];
+    blue += pixels[i + 2];
+    const value = (pixels[i] * 299 + pixels[i + 1] * 587 + pixels[i + 2] * 114) / 1000;
+    luminance += value;
+    if (value < 70) dark += 1;
+    if (value > 190) bright += 1;
+    count += 1;
   }
-  if (typeof result !== "object" || result === null || !("caption" in result) ||
-    typeof result.caption !== "string" || !result.caption.trim() ||
-    !("local_only" in result) || result.local_only !== true) {
-    throw new Error("استجابة Florence-2 المحلية غير صالحة.");
-  }
-  return result.caption.trim();
+  const avgRed = red / count;
+  const avgGreen = green / count;
+  const avgBlue = blue / count;
+  const avgLum = luminance / count;
+
+  const palette = avgGreen > avgRed * 1.12 && avgGreen > avgBlue * 1.05
+    ? "طبيعة وخضرة"
+    : avgBlue > avgRed * 1.12
+      ? "مشهد بسمات زرقاء"
+      : avgRed > avgGreen * 1.15
+        ? "ألوان دافئة ودرجات حمراء"
+        : avgLum > 175
+          ? "مشهد فاتح وواضح"
+          : avgLum < 75
+            ? "مشهد داكن أو ليلي"
+            : "مشهد متوازن الألوان";
+  const detail = dark > count * 0.18
+    ? "به مناطق مظللة واضحة"
+    : bright > count * 0.25
+      ? "وبه مناطق مضيئة"
+      : "وبتباين متوسط";
+
+  return `تحليل متصفح مجاني: ${palette}، أبعاد الصورة ${img.naturalWidth}×${img.naturalHeight}${detail}.`;
 }

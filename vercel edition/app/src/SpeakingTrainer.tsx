@@ -74,6 +74,17 @@ type SpeechEngineStatus = {
   size_bytes: number;
 };
 
+type BrowserSpeechRecognition = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+
 const tutorMoods: Array<{ id: TutorMood; label: string; description: string; instruction: string; greeting: string }> = [
   { id: "encouraging", label: "مشجّع", description: "ودود ويركّز على التقدّم.", instruction: "كن مدربًا مشجعًا ودافئًا، احتفل بما نجح فيه المتعلم، وصغ النقد بلطف.", greeting: "كل محاولة بتقرّبك من هدفك!" },
   { id: "playful", label: "ساخر بلطف", description: "مزاح خفيف من غير إحراج.", instruction: "استخدم دعابة مصرية خفيفة وذكية ولمسة سخرية محببة عند الملاءمة، من دون إهانة المتعلم أو التقليل منه. اجعل التصحيح واضحًا والاحترام حاضرًا دائمًا.", greeting: "يلا نلمّع الإنجليزي ده من غير دراما!" },
@@ -180,6 +191,7 @@ export default function SpeakingTrainer({ onOpenProviders }: { onOpenProviders: 
   const recordingBaseRef = useRef("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
+  const browserRecognitionRef = useRef<BrowserSpeechRecognition | null>(null);
 
   const part = practiceParts[partIndex];
   const currentQuestions = [...part.questions, ...(generatedQuestions[partIndex] ?? [])];
@@ -283,63 +295,36 @@ export default function SpeakingTrainer({ onOpenProviders }: { onOpenProviders: 
   }
 
   async function speakText(text: string, language: VoiceLanguage) {
-    if (!voices[language]?.installed) {
-      setError(`نزّل الصوت المحلي ${language === "ar" ? "العربي" : "الإنجليزي"} أولًا من بطاقة الشخصية.`);
-      return;
-    }
     stopSpeaking();
     setError("");
     setAvatarActivity("thinking");
-    let audio: HTMLAudioElement | null = null;
-    try {
-      const response = await apiFetch(`${API_BASE}/api/speech/synthesize`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ language, text: text.slice(0, 5000) }),
-      });
-      if (!response.ok) {
-        let message = `تعذّر توليد الصوت (${response.status}).`;
-        try {
-          const body = await response.json() as { detail?: unknown };
-          if (typeof body.detail === "string") message = body.detail;
-        } catch {
-          // Keep the HTTP status message if the backend did not return JSON.
-        }
-        throw new Error(message);
-      }
-      const url = URL.createObjectURL(await response.blob());
-      audioUrlRef.current = url;
-      audio = new Audio(url);
-      audioRef.current = audio;
-      audio.onplay = () => {
+
+    if ("speechSynthesis" in window) {
+      const utterance = new SpeechSynthesisUtterance(text.slice(0, 5000));
+      utterance.lang = language === "ar" ? "ar-JO" : "en-US";
+      const voices = window.speechSynthesis.getVoices();
+      const matching = voices.find((voice) => voice.lang.toLowerCase().startsWith(language === "ar" ? "ar" : "en"));
+      if (matching) utterance.voice = matching;
+      utterance.onstart = () => {
         setSpeaking(true);
         setAvatarActivity("speaking");
       };
-      audio.onended = () => {
-        if (audioRef.current !== audio) return;
+      utterance.onend = () => {
         setSpeaking(false);
         setAvatarActivity("idle");
-        URL.revokeObjectURL(url);
-        audioUrlRef.current = null;
-        audioRef.current = null;
       };
-      audio.onerror = () => {
-        if (audioRef.current !== audio) return;
+      utterance.onerror = () => {
         setSpeaking(false);
         setAvatarActivity("idle");
-        setError("تعذّر تشغيل ملف الصوت المحلي.");
-        URL.revokeObjectURL(url);
-        audioUrlRef.current = null;
-        audioRef.current = null;
+        setError("تعذّر تشغيل صوت المتصفح. اختَر لغة صوت من إعدادات النظام أو استخدم متصفحًا يدعم SpeechSynthesis.");
       };
-      await audio.play();
-    } catch (reason) {
-      if (reason instanceof DOMException && reason.name === "AbortError") return;
-      if (audio && audioRef.current !== audio) return;
-      setSpeaking(false);
-      setAvatarActivity("idle");
-      setError(reason instanceof Error ? reason.message : "تعذّر تشغيل الصوت المحلي.");
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
+      return;
     }
+
+    setAvatarActivity("idle");
+    setError("المتصفح لا يدعم صوت النطق. استخدم Chrome أو Edge حديثًا.");
   }
 
   function stopSpeaking() {
@@ -428,6 +413,15 @@ export default function SpeakingTrainer({ onOpenProviders }: { onOpenProviders: 
   }
 
   function stopRecording() {
+    const browserRecognition = browserRecognitionRef.current;
+    if (browserRecognition) {
+      browserRecognition.onend = null;
+      browserRecognition.stop();
+      browserRecognitionRef.current = null;
+      setRecording(false);
+      setAvatarActivity("idle");
+      return;
+    }
     const recorder = recorderRef.current;
     if (recordingTimerRef.current !== null) {
       window.clearTimeout(recordingTimerRef.current);
@@ -448,12 +442,52 @@ export default function SpeakingTrainer({ onOpenProviders }: { onOpenProviders: 
       return;
     }
     if (transcribing || installingTranscription || requestingMicrophone) return;
-    if (!transcriptionEngine?.installed) {
-      setError("حمّل نموذج Whisper المحلي من بطاقة المدرّب أولًا؛ حجمه نحو 148 ميغابايت.");
-      return;
+    const browserSpeechWindow = window as unknown as {
+      SpeechRecognition?: new () => BrowserSpeechRecognition;
+      webkitSpeechRecognition?: new () => BrowserSpeechRecognition;
+    };
+    const Recognition = browserSpeechWindow.SpeechRecognition ?? browserSpeechWindow.webkitSpeechRecognition;
+
+    if (Recognition) {
+      try {
+        const recognition = new Recognition();
+        recognition.lang = speechLanguage === "ar" ? "ar-JO" : "en-US";
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recordingBaseRef.current = answer.trim();
+        setRecording(true);
+        setAvatarActivity("listening");
+        setError("");
+        recognition.onresult = (event) => {
+          const transcripts: string[] = [];
+          for (let i = 0; i < event.results.length; i += 1) {
+            const item = event.results[i]?.[0];
+            if (item?.transcript) transcripts.push(item.transcript);
+          }
+          const prefix = recordingBaseRef.current.trim();
+          setAnswer([prefix, transcripts.join(" ")].filter(Boolean).join(" "));
+          setAvatarActivity("transcribing");
+        };
+        recognition.onerror = () => {
+          setError("تعذّر الاستماع من المتصفح. تأكد من إذن الميكروفون واستخدم Chrome أو Edge.");
+          setAvatarActivity("idle");
+          setRecording(false);
+        };
+        recognition.onend = () => {
+          browserRecognitionRef.current = null;
+          setRecording(false);
+          setAvatarActivity((current) => current === "transcribing" ? "encouraging" : "idle");
+        };
+        browserRecognitionRef.current = recognition;
+        recognition.start();
+        return;
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : "تعذّر تشغيل التعرف على الكلام في المتصفح.");
+      }
     }
+
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-      setError("تسجيل الصوت غير متاح في هذا المتصفح. افتح التطبيق على localhost أو استخدم متصفحًا أحدث.");
+      setError("تسجيل الصوت غير متاح في هذا المتصفح. استخدم Chrome أو Edge حديثًا.");
       return;
     }
 

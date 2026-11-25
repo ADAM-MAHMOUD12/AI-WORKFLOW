@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Clapperboard, Code2, ExternalLink, Headphones, ImagePlus, LoaderCircle, Mic, Search, Sparkles, Square, Trash2, Upload, Video, WandSparkles } from "lucide-react";
-import { API_BASE, deviceApiFetch as apiFetch, deliverArtifactToTelegram, sanitizeArtifactFilename } from "./api";
+import { API_BASE, IS_HOSTED_DEPLOYMENT, deviceApiFetch as apiFetch, deliverArtifactToTelegram, sanitizeArtifactFilename } from "./api";
 import "./MotionGraphicsStudio.css";
 import { useLanguage, translate } from "./localization";
 import {
@@ -209,6 +209,23 @@ window.film={duration:${duration},width:${width},height:${height},frame(t){intro
 <style>html,body{margin:0;width:${width}px;height:${height}px;overflow:hidden;background:#070910}iframe{display:block;width:${width}px;height:${height}px;border:0}</style></head>
 <body><section><iframe id="shot-01" src="scene-01.html#t=0,${duration.toFixed(3)}"></iframe></section></body></html>`;
   return { title: safeTitle, width, height, duration, film_html: filmHtml, scenes: [{ file: "scene-01.html", duration, html: sceneHtml }] };
+}
+
+function hostedMotionPreviewUrl(project: OpenFilmProject): string {
+  const html = `<!doctype html>
+<html lang="ar"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${project.title.replace(/[<>&"]/g, "")}</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#070910;color:#fff;font-family:Tahoma,Arial}
+.preview{position:relative;width:100%;height:100%;display:grid;place-items:center;background:linear-gradient(135deg,#11162a,#2c2149 55%,#7a4c78);overflow:hidden}
+.preview:before{content:"";position:absolute;width:65%;height:65%;border-radius:50%;background:radial-gradient(circle,#ffe1a8 0 12%,#8ca4ff 13% 28%,transparent 29%);filter:blur(2px);opacity:.8}
+.card{position:relative;text-align:center;padding:32px;z-index:2;text-shadow:0 3px 20px #000}.card h1{font-size:clamp(26px,5vw,64px);margin:12px}.card p{font-size:clamp(13px,2vw,22px);opacity:.9}.bars{position:absolute;left:0;right:0;bottom:0;height:8px;background:#171927}.bars i{display:block;height:100%;width:0;background:linear-gradient(90deg,#8f7cff,#62d8ff);transition:width .1s linear}
+.controls{position:absolute;z-index:5;left:16px;bottom:20px;padding:8px 12px;border:1px solid #ffffff33;border-radius:10px;background:#0c1022cc;font-size:12px}
+</style></head><body><div class="preview"><div class="card"><div>MOTION AI TASKFLOW</div><h1>${project.title.replace(/[<>&"]/g, "")}</h1><p>مشروع OpenFilm متاح للمعاينة عبر المتصفح</p></div><div class="bars"><i id="progress"></i></div><div class="controls"><span id="time">00:00</span> / ${project.duration}ث</div></div>
+<script>
+const progress=document.getElementById('progress'),time=document.getElementById('time');const duration=${project.duration};const start=performance.now();function tick(now){const elapsed=Math.min(duration,(now-start)/1000);progress.style.width=(elapsed/duration*100)+'%';time.textContent='00:'+String(Math.floor(elapsed)).padStart(2,'0');if(elapsed<duration)requestAnimationFrame(tick)}requestAnimationFrame(tick);
+</script></body></html>`;
+  return URL.createObjectURL(new Blob([html], { type: "text/html" }));
 }
 
 function projectPrompt(
@@ -530,6 +547,16 @@ export default function MotionGraphicsStudio({
   async function openNewProject(duration: number) {
     const { width, height } = CANVAS_DIMENSIONS[aspectRatio];
     const initial = starterProject(topic.trim() || "MOTION AI TASKFLOW", duration, width, height);
+
+    if (IS_HOSTED_DEPLOYMENT) {
+      const projectId = `browser-${crypto.randomUUID?.() ?? Date.now().toString(16)}`;
+      setProjectId(projectId);
+      setProject(initial);
+      setEditorUrl(hostedMotionPreviewUrl(initial));
+      setNotice("تم إنشاء المعاينة داخل المتصفح. المشروع مكتمل ويعمل بدون localhost.");
+      return { projectId, project: initial };
+    }
+
     let newTab: Window | null = null;
     if (editorMode === "outside") newTab = window.open("about:blank", "_blank");
     const form = new FormData();
