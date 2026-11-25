@@ -34,7 +34,16 @@
     { "source": "/demos/(.*)", "destination": { "service": "engine-three", "path": "/demos/$1" } },
     { "source": "/fonts/(.*)", "destination": { "service": "engine-three", "path": "/fonts/$1" } },
     { "source": "/logo-200.png", "destination": { "service": "engine-three", "path": "/logo-200.png" } },
-    { "source": "/engine/3d/api/(.*)", "destination": { "service": "backend", "path": "/api/$1" } },
+    { "source": "/icons/(.*)", "destination": { "service": "engine-three", "path": "/icons/$1" } },
+    { "source": "/audios/(.*)", "destination": { "service": "engine-three", "path": "/audios/$1" } },
+    { "source": "/items/(.*)", "destination": { "service": "engine-three", "path": "/items/$1" } },
+    { "source": "/material/(.*)", "destination": { "service": "engine-three", "path": "/material/$1" } },
+    { "source": "/hdri/(.*)", "destination": { "service": "engine-three", "path": "/hdri/$1" } },
+    { "source": "/demos/(.*)", "destination": { "service": "engine-three", "path": "/demos/$1" } },
+    { "source": "/fonts/(.*)", "destination": { "service": "engine-three", "path": "/fonts/$1" } },
+    { "source": "/logo-200.png", "destination": { "service": "engine-three", "path": "/logo-200.png" } },
+    { "source": "/engine/3d/api/scenes", "destination": { "service": "backend", "path": "/api/scenes" } },
+    { "source": "/engine/3d/api/scenes/(.*)", "destination": { "service": "backend", "path": "/api/scenes/$1" } },
     {
       "source": "/engine/3d",
       "destination": {
