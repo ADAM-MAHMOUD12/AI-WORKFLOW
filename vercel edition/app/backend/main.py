@@ -6085,7 +6085,7 @@ async def save_telegram_bot_settings(
                 "UPDATE telegram_bots SET last_error = ? WHERE user_id = ?",
                 (str(exc)[:300], user_id),
             )
-        raise HTTPException(status_code=502, detail=f"حُفظت الإعدادات لكن تعذّر تشغيل بوت Telegram: {exc}") from exc
+        return await get_telegram_bot_settings(principal)
     return await get_telegram_bot_settings(principal)
 
 

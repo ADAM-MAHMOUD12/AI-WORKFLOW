@@ -51,6 +51,7 @@ import ArchitecturalPlanStudio from "./ArchitecturalPlanStudio";
 import MotionGraphicsStudio from "./MotionGraphicsStudio";
 import ProgrammingStudio from "./ProgrammingStudio";
 import ContentEditingStudio from "./ContentEditingStudio";
+import StaticWebStudio from "./StaticWebStudio";
 import DocumentAttachments, { documentsAsContext, type TextDocument } from "./DocumentAttachments";
 import AuthGate from "./AuthGate";
 import { useAuth } from "./authContext";
@@ -122,6 +123,7 @@ const navItems: DashboardNavItem[] = [
   { label: "Architectural Plan", icon: Building2 },
   { label: "Motion Graphics", icon: Clapperboard },
   { label: "Content Editing", icon: Film },
+  { label: "Static Web", icon: Code2 },
   { label: "Programming", icon: Code2 },
   { label: "Skills", icon: Sparkles },
   { label: "AI Planner", icon: Table2 },
@@ -1164,6 +1166,10 @@ function WorkspaceApp() {
 
     if (page === "Markdown") {
       return renderMarkdownPage();
+    }
+
+    if (page === "Static Web") {
+      return <StaticWebStudio />;
     }
 
     // صفحة مزوّدي الذكاء الاصطناعي الفعلية

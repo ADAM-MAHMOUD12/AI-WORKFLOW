@@ -35,6 +35,7 @@ export type Page =
   | "AI TaskFlow 3D"
   | "AI Planner"
   | "Markdown"
+  | "Static Web"
   | "AI Providers"
   | "Settings";
 
@@ -94,6 +95,7 @@ const pageLabels: Record<Page, string> = {
   Skills: "المهارات",
   "AI Planner": "منظّم ذكي",
   Markdown: "مستند Markdown",
+  "Static Web": "محرر ويب ثابت",
   "AI Providers": "مزوّدو الذكاء الاصطناعي",
   Settings: "الإعدادات",
 };
@@ -104,7 +106,7 @@ function localizedPageLabel(page: Page, language: "ar" | "en") {
 }
 
 const navGroups: { label: string; englishLabel: string; pages: Page[] }[] = [
-  { label: "مساحة العمل", englishLabel: "Workspace", pages: ["Overview", "Projects", "Flowchart", "Markdown"] },
+  { label: "مساحة العمل", englishLabel: "Workspace", pages: ["Overview", "Projects", "Flowchart", "Markdown", "Static Web"] },
   {
     label: "استوديو AI",
     englishLabel: "AI Studio",

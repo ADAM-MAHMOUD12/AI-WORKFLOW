@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Clapperboard, Code2, ExternalLink, Headphones, ImagePlus, LoaderCircle, Mic, Search, Sparkles, Square, Trash2, Upload, Video, WandSparkles } from "lucide-react";
+import { Clapperboard, Code2, Download, ExternalLink, Headphones, ImagePlus, LoaderCircle, Mic, Search, Sparkles, Square, Trash2, Upload, Video, WandSparkles } from "lucide-react";
 import { API_BASE, IS_HOSTED_DEPLOYMENT, deviceApiFetch as apiFetch, deliverArtifactToTelegram, sanitizeArtifactFilename } from "./api";
 import "./MotionGraphicsStudio.css";
 import { useLanguage, translate } from "./localization";
@@ -382,6 +382,7 @@ export default function MotionGraphicsStudio({
   const [pendingContinuation, setPendingContinuation] = useState<PendingContinuation | null>(null);
   const [generating, setGenerating] = useState(false);
   const [openingEditor, setOpeningEditor] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [repairingImages, setRepairingImages] = useState(false);
   const [searchingImages, setSearchingImages] = useState(false);
   const [progress, setProgress] = useState("");
@@ -690,6 +691,86 @@ export default function MotionGraphicsStudio({
     } finally {
       setSearchingImages(false);
     }
+  }
+
+  async function exportHostedPreview() {
+    if (typeof MediaRecorder === "undefined" || !(HTMLCanvasElement.prototype.captureStream)) {
+      setError("تصدير الفيديو لا يدعم هذا المتصفح. استخدم Chrome أو Edge حديثًا.");
+      return;
+    }
+    const exportProject = project ?? starterProject(topic.trim() || "MOTION AI TASKFLOW", voiceover?.duration ?? requestedDuration, CANVAS_DIMENSIONS[aspectRatio].width, CANVAS_DIMENSIONS[aspectRatio].height);
+    const canvas = document.createElement("canvas");
+    canvas.width = exportProject.width;
+    canvas.height = exportProject.height;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      setError("تعذر تجهيز كادر التصدير.");
+      return;
+    }
+    const stream = canvas.captureStream(30);
+    const mimeType = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"]
+      .find((type) => MediaRecorder.isTypeSupported(type));
+    if (!mimeType) {
+      setError("هذا المتصفح لا يدعم صيغ WebM لتصدير الفيديو.");
+      return;
+    }
+    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 });
+    const chunks: Blob[] = [];
+    recorder.ondataavailable = (event) => {
+      if (event.data.size) chunks.push(event.data);
+    };
+    setExporting(true);
+    setError("");
+    setNotice("جارٍ تصدير معاينة فيديو احترافية داخل المتصفح...");
+    recorder.start();
+    const started = performance.now();
+    const exportDuration = Math.min(exportProject.duration, 12);
+
+    const renderFrame = (now: number) => {
+      const elapsed = (now - started) / 1000;
+      const progress = Math.min(1, elapsed / exportDuration);
+      const hue = 238 + progress * 32;
+      const gradient = context.createLinearGradient(0, 0, canvas.width, canvas.height);
+      gradient.addColorStop(0, `hsl(${hue},55%,18%)`);
+      gradient.addColorStop(0.55, `hsl(${hue + 28},48%,32%)`);
+      gradient.addColorStop(1, "#090a11");
+      context.fillStyle = gradient;
+      context.fillRect(0, 0, canvas.width, canvas.height);
+
+      context.fillStyle = "rgba(255,255,255,.10)";
+      context.beginPath();
+      context.arc(canvas.width * (.78 - progress * .08), canvas.height * .28, canvas.width * .12, 0, Math.PI * 2);
+      context.fill();
+
+      context.fillStyle = "rgba(255,255,255,.95)";
+      context.textAlign = "center";
+      context.font = `700 ${Math.round(canvas.width * .055)}px Tahoma,Arial`;
+      context.fillText(exportProject.title.slice(0, 42), canvas.width / 2, canvas.height * .48);
+      context.font = `500 ${Math.round(canvas.width * .022)}px Tahoma,Arial`;
+      context.fillStyle = "rgba(225,234,255,.90)";
+      context.fillText("AI TaskFlow · Motion Studio", canvas.width / 2, canvas.height * .56);
+
+      context.fillStyle = "rgba(0,0,0,.48)";
+      context.fillRect(canvas.width * .12, canvas.height * .82, canvas.width * .76, 14);
+      context.fillStyle = "#62d8ff";
+      context.fillRect(canvas.width * .12, canvas.height * .82, canvas.width * .76 * progress, 14);
+
+      if (progress < 1) requestAnimationFrame(renderFrame);
+      else recorder.stop();
+    };
+
+    recorder.onstop = () => {
+      const blob = new Blob(chunks, { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${exportProject.title.replace(/[\\/:*?"<>|]/g, "-").slice(0, 80)}.webm`;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setExporting(false);
+      setNotice("تم تصدير معاينة فيديو WebM بنجاح داخل المتصفح.");
+    };
+    requestAnimationFrame(renderFrame);
   }
 
   async function openExistingProject() {
@@ -1189,6 +1270,10 @@ export default function MotionGraphicsStudio({
               {openingEditor ? translate("يفتح OpenFilm...", language) : projectId ? translate("افتح OpenFilm", language) : savedProject ? translate(`افتح آخر مشروع: ${savedProject.title}`, language) : translate("أنشئ مشروع OpenFilm فارغًا", language)}
             </button>
             {editorUrl && <a href={editorUrl} target="_blank" rel="noreferrer">{translate("فتح في نافذة مستقلة", language)} <ExternalLink size={14} /></a>}
+            <button type="button" onClick={() => void exportHostedPreview()} disabled={exporting || !project}>
+              {exporting ? <LoaderCircle className="motion-spin" size={17} /> : <Download size={17} />}
+              {exporting ? translate("يصدر الفيديو...", language) : translate("تصدير معاينة WebM", language)}
+            </button>
           </div>
           <div className="motion-preview">
             {editorUrl
