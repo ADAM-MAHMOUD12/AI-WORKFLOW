@@ -317,7 +317,7 @@ function SceneEditor({ initialScene, meta: initialMeta }: SceneLoaderProps) {
   )
 
   useEffect(() => {
-    const source = new EventSource(`/api/scenes/${meta.id}/events`)
+    const source = new EventSource(hostedSceneApiPath(`/api/scenes/${meta.id}/events`))
 
     source.addEventListener('scene', (event) => {
       let payload: LiveSceneEvent

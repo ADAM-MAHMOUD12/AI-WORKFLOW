@@ -2,8 +2,9 @@
 
 import { type ArtifactStore, configureArtifactStore, getArtifactStore } from '@aedifex/core'
 import { useEffect } from 'react'
+import { hostedSceneApiPath } from '@/lib/hosted-api'
 
-const artifactUrl = (sha256: string) => `/api/artifacts/${sha256}`
+const artifactUrl = (sha256: string) => hostedSceneApiPath(`/api/artifacts/${sha256}`)
 const localArtifactStore: ArtifactStore = {
   url: artifactUrl,
   put: async (sha256, bytes, mimeType) => {

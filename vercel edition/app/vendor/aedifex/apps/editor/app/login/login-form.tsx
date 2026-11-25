@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { type FormEvent, useState } from 'react'
 import { PRIMARY_PILL } from '@/components/app-shell'
 import { cn } from '@/lib/utils'
+import { hostedSceneApiPath } from '@/lib/hosted-api'
 
 export function LoginForm({ next }: { next: string }) {
   const router = useRouter()
@@ -16,7 +17,7 @@ export function LoginForm({ next }: { next: string }) {
     setSubmitting(true)
     setError(null)
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch(hostedSceneApiPath('/api/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password }),

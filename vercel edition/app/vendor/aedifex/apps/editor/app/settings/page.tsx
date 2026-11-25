@@ -22,6 +22,9 @@ export default async function SettingsPage() {
   const request = await currentRequest()
   const publicUrl = resolvePublicUrl(request)
   const authMode = resolveAuthMode(request)
+  const logoutPath = process.env.AEDIFEX_BASE_PATH === '/engine/3d' || process.env.VERCEL === '1'
+    ? '/engine/3d/api/auth/logout'
+    : '/api/auth/logout'
   const agentTokenConfigured = Boolean(process.env.AEDIFEX_SCENE_API_TOKEN)
 
   return (
@@ -64,7 +67,7 @@ export default async function SettingsPage() {
             <Section title="Account">
               <div className="flex items-center justify-between gap-4 px-4 py-3">
                 <p className="text-muted-foreground text-sm">Signed in as the instance admin.</p>
-                <form action="/api/auth/logout" method="post">
+                <form action={logoutPath} method="post">
                   <button className={SECONDARY_PILL} type="submit">
                     Sign out
                   </button>

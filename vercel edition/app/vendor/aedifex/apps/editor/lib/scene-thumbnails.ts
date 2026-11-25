@@ -25,7 +25,8 @@ export async function readSceneThumbnail(id: string): Promise<Uint8Array | null>
 export async function sceneThumbnailUrl(id: string): Promise<string | null> {
   try {
     const { mtimeMs } = await stat(thumbnailFile(id))
-    return `/api/scenes/${id}/thumbnail?t=${mtimeMs}`
+    const basePath = process.env.AEDIFEX_BASE_PATH === '/engine/3d' || process.env.VERCEL === '1' ? '/engine/3d' : ''
+  return `${basePath}/api/scenes/${id}/thumbnail?t=${mtimeMs}`
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
     throw error
