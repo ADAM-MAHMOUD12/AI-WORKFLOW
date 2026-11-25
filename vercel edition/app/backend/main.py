@@ -4966,9 +4966,151 @@ async def update_motion_editor_project(
     return {"updated": True, "image_report": image_report}
 
 
+def aedifex_scene_record(row: Any) -> dict[str, Any]:
+    graph = json.loads(row["graph_json"])
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "projectId": None,
+        "ownerId": row["user_id"],
+        "thumbnailUrl": row["thumbnail_url"],
+        "version": int(row["version"]),
+        "createdAt": str(row["created_at"]),
+        "updatedAt": str(row["updated_at"]),
+        "sizeBytes": len(row["graph_json"].encode("utf-8")),
+        "nodeCount": int(row["node_count"]),
+        "editorUrl": f"/engine/3d/project/{row['id']}",
+        "url": f"/engine/3d/project/{row['id']}",
+        "published": True,
+        "graphHash": hashlib.sha256(row["graph_json"].encode("utf-8")).hexdigest(),
+        "graph": graph,
+    }
+
+
+def scene_node_count(graph: dict[str, Any]) -> int:
+    nodes = graph.get("nodes")
+    return len(nodes) if isinstance(nodes, dict) else 0
+
+
+@app.get("/api/scenes")
+@app.get("/engine/3d/api/scenes")
+async def list_hosted_aedifex_scenes(request: Request):
+    principal = session_user(bearer_token(request.headers.get("authorization")))
+    owner_id = principal["id"] if principal else None
+    with db_connection() as db:
+        if owner_id:
+            rows = db.execute(
+                "SELECT * FROM aedifex_scenes WHERE user_id = ? OR user_id IS NULL ORDER BY updated_at DESC",
+                (owner_id,),
+            ).fetchall()
+        else:
+            rows = db.execute("SELECT * FROM aedifex_scenes ORDER BY updated_at DESC").fetchall()
+    return {"scenes": [aedifex_scene_record(row) for row in rows]}
+
+
+@app.post("/api/scenes")
+@app.post("/engine/3d/api/scenes")
+async def create_hosted_aedifex_scene(request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body.")
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Invalid scene payload.")
+    scene_id = str(payload.get("id") or uuid.uuid4().hex[:12])
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", scene_id):
+        raise HTTPException(status_code=422, detail="Invalid scene id.")
+    name = str(payload.get("name") or "Project #1").strip()[:200]
+    graph = payload.get("graph")
+    if not isinstance(graph, dict):
+        raise HTTPException(status_code=422, detail="Invalid scene graph.")
+    principal = session_user(bearer_token(request.headers.get("authorization")))
+    owner_id = principal["id"] if principal else None
+    graph_json = json.dumps(graph, ensure_ascii=False, separators=(",", ":"))
+    node_count = scene_node_count(graph)
+    thumbnail_url = payload.get("thumbnailUrl") if isinstance(payload.get("thumbnailUrl"), str) else None
+    with db_connection() as db:
+        db.execute(
+            """
+            INSERT INTO aedifex_scenes (id, user_id, name, graph_json, thumbnail_url, version, node_count, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, 1, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """,
+            (scene_id, owner_id, name, graph_json, thumbnail_url, node_count),
+        )
+        row = db.execute("SELECT * FROM aedifex_scenes WHERE id = ?", (scene_id,)).fetchone()
+    record = aedifex_scene_record(row)
+    return JSONResponse(record, status_code=201, headers={"Location": record["editorUrl"]})
+
+
+@app.get("/api/scenes/{scene_id}")
+@app.get("/engine/3d/api/scenes/{scene_id}")
+async def get_hosted_aedifex_scene(scene_id: str):
+    with db_connection() as db:
+        row = db.execute("SELECT * FROM aedifex_scenes WHERE id = ?", (scene_id,)).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    return aedifex_scene_record(row)
+
+
+@app.put("/api/scenes/{scene_id}")
+@app.put("/engine/3d/api/scenes/{scene_id}")
+async def update_hosted_aedifex_scene(scene_id: str, request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body.")
+    graph = payload.get("graph") if isinstance(payload, dict) else None
+    if not isinstance(graph, dict):
+        raise HTTPException(status_code=422, detail="Invalid scene graph.")
+    name = str(payload.get("name") or "Project #1").strip()[:200]
+    graph_json = json.dumps(graph, ensure_ascii=False, separators=(",", ":"))
+    with db_connection() as db:
+        existing = db.execute("SELECT * FROM aedifex_scenes WHERE id = ?", (scene_id,)).fetchone()
+        if existing is None:
+            raise HTTPException(status_code=404, detail="Project not found.")
+        version = int(existing["version"] or 1) + 1
+        db.execute(
+            "UPDATE aedifex_scenes SET name = ?, graph_json = ?, node_count = ?, version = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (name, graph_json, scene_node_count(graph), version, scene_id),
+        )
+        row = db.execute("SELECT * FROM aedifex_scenes WHERE id = ?", (scene_id,)).fetchone()
+    return aedifex_scene_record(row)
+
+
+@app.delete("/api/scenes/{scene_id}", status_code=204)
+@app.delete("/engine/3d/api/scenes/{scene_id}", status_code=204)
+async def delete_hosted_aedifex_scene(scene_id: str):
+    with db_connection() as db:
+        cursor = db.execute("DELETE FROM aedifex_scenes WHERE id = ?", (scene_id,))
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Project not found.")
+    return None
+
+
 @app.post("/api/aedifex/scenes", dependencies=[Depends(require_api_token)])
-async def create_aedifex_scene(payload: dict[str, Any]):
+async def create_aedifex_scene(payload: dict[str, Any], principal: dict[str, Any] | None = Depends(require_api_token)):
     """Create a scene in AI TaskFlow 3D and normalize its graph for the editor API."""
+    if IS_VERCEL:
+        scene_id = str(payload.get("id") or uuid.uuid4().hex[:12])
+        name = str(payload.get("name") or "AI TaskFlow 3D Plan").strip()[:200]
+        graph = payload.get("graph")
+        if not isinstance(graph, dict):
+            raise HTTPException(status_code=422, detail="Invalid 3D scene graph.")
+        graph_json = json.dumps(graph, ensure_ascii=False, separators=(",", ":"))
+        owner_id = principal["id"] if principal else None
+        with db_connection() as db:
+            db.execute(
+                """
+                INSERT INTO aedifex_scenes (id, user_id, name, graph_json, thumbnail_url, version, node_count, created_at, updated_at)
+                VALUES (?, ?, ?, ?, NULL, 1, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT(id) DO UPDATE SET name = excluded.name, graph_json = excluded.graph_json,
+                    node_count = excluded.node_count, version = aedifex_scenes.version + 1,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (scene_id, owner_id, name, graph_json, scene_node_count(graph)),
+            )
+            row = db.execute("SELECT * FROM aedifex_scenes WHERE id = ?", (scene_id,)).fetchone()
+        return aedifex_scene_record(row)
     aedifex_url = os.getenv("AEDIFEX_URL", "").strip().rstrip("/")
     if aedifex_url:
         aedifex_url = f"{aedifex_url}/api/scenes" if IS_VERCEL else aedifex_url

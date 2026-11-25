@@ -94,6 +94,22 @@ def initialize_database() -> None:
                 """
             )
             db.execute("ALTER TABLE providers ADD COLUMN IF NOT EXISTS user_id TEXT")
+            db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS aedifex_scenes (
+                    id TEXT PRIMARY KEY,
+                    user_id TEXT,
+                    name TEXT NOT NULL,
+                    graph_json TEXT NOT NULL,
+                    thumbnail_url TEXT,
+                    version INTEGER NOT NULL DEFAULT 1,
+                    node_count INTEGER NOT NULL DEFAULT 0,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            db.execute("CREATE INDEX IF NOT EXISTS aedifex_scenes_user_id ON aedifex_scenes (user_id)")
             db.execute("ALTER TABLE app_data ADD COLUMN IF NOT EXISTS user_id TEXT NOT NULL DEFAULT ''")
             db.execute("ALTER TABLE app_data DROP CONSTRAINT IF EXISTS app_data_pkey")
             db.execute("ALTER TABLE app_data ADD CONSTRAINT app_data_pkey PRIMARY KEY (key, user_id)")
@@ -259,6 +275,22 @@ def initialize_database() -> None:
         provider_columns = {row["name"] for row in db.execute("PRAGMA table_info(providers)").fetchall()}
         if "user_id" not in provider_columns:
             db.execute("ALTER TABLE providers ADD COLUMN user_id TEXT")
+        db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS aedifex_scenes (
+                id TEXT PRIMARY KEY,
+                user_id TEXT,
+                name TEXT NOT NULL,
+                graph_json TEXT NOT NULL,
+                thumbnail_url TEXT,
+                version INTEGER NOT NULL DEFAULT 1,
+                node_count INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        db.execute("CREATE INDEX IF NOT EXISTS aedifex_scenes_user_id ON aedifex_scenes (user_id)")
         db.execute(
             """
             CREATE TABLE IF NOT EXISTS app_data (
